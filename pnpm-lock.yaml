@@ -161,6 +161,9 @@ importers:
       react-hook-form:
         specifier: latest
         version: 7.60.0(react@19.0.0)
+      react-is:
+        specifier: ^19.1.0
+        version: 19.1.0
       react-resizable-panels:
         specifier: latest
         version: 3.0.3(react-dom@19.0.0(react@19.0.0))(react@19.0.0)

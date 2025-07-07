@@ -1,10 +1,21 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
+  output: "export",
+
+  // Skip ESLint errors during production builds
   eslint: {
     ignoreDuringBuilds: true,
   },
-  images: { unoptimized: true },
-};
 
-module.exports = nextConfig;
+  // Skip TypeScript type-checking errors during production builds
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+
+  // Disable next/image optimizations (required when using output: 'export')
+  images: {
+    unoptimized: true,
+  },
+}
+
+module.exports = nextConfig

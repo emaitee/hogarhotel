@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import type { Reservation } from "@/lib/models/Reservation"
 
 export function useReservations() {
-  const [reservations, setReservations] = useState<any[]>([])
+  const [reservations, setReservations] = useState<Reservation[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -24,142 +25,85 @@ export function useReservations() {
     }
   }
 
-  const createReservation = async (reservationData: any) => {
-    try {
-      const response = await fetch("/api/reservations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(reservationData),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to create reservation")
-      }
-
-      const newReservation = await response.json()
-      setReservations((prev) => [...prev, newReservation])
-      return newReservation
-    } catch (err) {
-      throw err
-    }
-  }
-
-  const updateReservation = async (reservationId: string, updateData: any) => {
-    try {
-      const response = await fetch(`/api/reservations/${reservationId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updateData),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to update reservation")
-      }
-
-      const updatedReservation = await response.json()
-      setReservations((prev) => prev.map((res) => (res._id === reservationId ? updatedReservation : res)))
-      return updatedReservation
-    } catch (err) {
-      throw err
-    }
-  }
-
-  const deleteReservation = async (reservationId: string) => {
-    try {
-      const response = await fetch(`/api/reservations/${reservationId}`, {
-        method: "DELETE",
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to delete reservation")
-      }
-
-      setReservations((prev) => prev.filter((res) => res._id !== reservationId))
-      return true
-    } catch (err) {
-      throw err
-    }
-  }
-
-  const checkIn = async (reservationId: string) => {
-    try {
-      const response = await fetch(`/api/reservations/check-in/${reservationId}`, {
-        method: "POST",
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to check in")
-      }
-
-      const result = await response.json()
-      setReservations((prev) => prev.map((res) => (res._id === reservationId ? result.reservation : res)))
-      return result
-    } catch (err) {
-      throw err
-    }
-  }
-
-  const checkOut = async (reservationId: string) => {
-    try {
-      const response = await fetch(`/api/reservations/check-out/${reservationId}`, {
-        method: "POST",
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to check out")
-      }
-
-      const result = await response.json()
-      setReservations((prev) => prev.map((res) => (res._id === reservationId ? result.reservation : res)))
-      return result
-    } catch (err) {
-      throw err
-    }
-  }
-
-  const getReservationById = async (reservationId: string) => {
-    try {
-      const response = await fetch(`/api/reservations/${reservationId}`)
-      if (!response.ok) {
-        throw new Error("Failed to fetch reservation")
-      }
-      return await response.json()
-    } catch (err) {
-      throw err
-    }
-  }
-
-  const getReservationsByGuest = (guestId: string) => {
-    return reservations.filter((reservation) => reservation.guestId === guestId)
-  }
-
-  const getReservationsByRoom = (roomId: string) => {
-    return reservations.filter((reservation) => reservation.roomId === roomId)
-  }
-
-  const getReservationsByStatus = (status: string) => {
-    return reservations.filter((reservation) => reservation.status === status)
-  }
-
-  const getReservationsByDateRange = (startDate: Date, endDate: Date) => {
-    return reservations.filter((reservation) => {
-      const checkIn = new Date(reservation.checkInDate)
-      const checkOut = new Date(reservation.checkOutDate)
-      return (
-        (checkIn >= startDate && checkIn <= endDate) ||
-        (checkOut >= startDate && checkOut <= endDate) ||
-        (checkIn <= startDate && checkOut >= endDate)
-      )
+  const createReservation = async (reservationData: Partial<Reservation>) => {
+    const response = await fetch("/api/reservations", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(reservationData),
     })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || "Failed to create reservation")
+    }
+
+    const newReservation = await response.json()
+    setReservations((prev) => [...prev, newReservation])
+    return newReservation
+  }
+
+  const updateReservation = async (id: string, reservationData: Partial<Reservation>) => {
+    const response = await fetch(`/api/reservations/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(reservationData),
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || "Failed to update reservation")
+    }
+
+    const updatedReservation = await response.json()
+    setReservations((prev) => prev.map((r) => (r._id === id ? updatedReservation : r)))
+    return updatedReservation
+  }
+
+  const deleteReservationHook = async (id: string) => {
+    const response = await fetch(`/api/reservations/${id}`, {
+      method: "DELETE",
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || "Failed to delete reservation")
+    }
+
+    setReservations((prev) => prev.filter((r) => r._id !== id))
+  }
+
+  const checkIn = async (id: string) => {
+    const response = await fetch(`/api/reservations/check-in/${id}`, {
+      method: "POST",
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || "Failed to check in")
+    }
+
+    const updatedReservation = await response.json()
+    setReservations((prev) => prev.map((r) => (r._id === id ? updatedReservation : r)))
+    return updatedReservation
+  }
+
+  const checkOut = async (id: string) => {
+    const response = await fetch(`/api/reservations/check-out/${id}`, {
+      method: "POST",
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || "Failed to check out")
+    }
+
+    const updatedReservation = await response.json()
+    setReservations((prev) => prev.map((r) => (r._id === id ? updatedReservation : r)))
+    return updatedReservation
   }
 
   useEffect(() => {
@@ -170,16 +114,11 @@ export function useReservations() {
     reservations,
     loading,
     error,
-    fetchReservations,
     createReservation,
     updateReservation,
-    deleteReservation,
+    deleteReservationHook,
     checkIn,
     checkOut,
-    getReservationById,
-    getReservationsByGuest,
-    getReservationsByRoom,
-    getReservationsByStatus,
-    getReservationsByDateRange,
+    refetch: fetchReservations,
   }
 }

@@ -40,6 +40,8 @@ export function ReservationForm({ isOpen, onClose, onSubmit, reservation }: Rese
   const [rooms, setRooms] = useState<Room[]>([])
   const [loading, setLoading] = useState(false)
   const [totalAmount, setTotalAmount] = useState(0)
+  const [checkInOpen, setCheckInOpen] = useState(false)
+  const [checkOutOpen, setCheckOutOpen] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -148,6 +150,8 @@ export function ReservationForm({ isOpen, onClose, onSubmit, reservation }: Rese
     })
   }
 
+  if (!isOpen) return null
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
@@ -157,7 +161,7 @@ export function ReservationForm({ isOpen, onClose, onSubmit, reservation }: Rese
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="guest">Guest</Label>
+              <Label htmlFor="guest">Guest *</Label>
               <Select value={formData.guestId} onValueChange={(value) => handleChange("guestId", value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a guest" />
@@ -173,7 +177,7 @@ export function ReservationForm({ isOpen, onClose, onSubmit, reservation }: Rese
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="room">Room</Label>
+              <Label htmlFor="room">Room *</Label>
               <Select value={formData.roomId} onValueChange={(value) => handleChange("roomId", value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a room" />
@@ -181,7 +185,7 @@ export function ReservationForm({ isOpen, onClose, onSubmit, reservation }: Rese
                 <SelectContent>
                   {rooms.map((room) => (
                     <SelectItem key={room._id!.toString()} value={room._id!.toString()}>
-                      Room {room.number} - {room.type} (${room.price}/night)
+                      Room {room.number} - {room.type} (₦{room.price.toLocaleString()}/night)
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -191,8 +195,8 @@ export function ReservationForm({ isOpen, onClose, onSubmit, reservation }: Rese
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Check-in Date</Label>
-              <Popover>
+              <Label>Check-in Date *</Label>
+              <Popover open={checkInOpen} onOpenChange={setCheckInOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
@@ -209,7 +213,13 @@ export function ReservationForm({ isOpen, onClose, onSubmit, reservation }: Rese
                   <Calendar
                     mode="single"
                     selected={formData.checkInDate}
-                    onSelect={(date) => date && handleChange("checkInDate", date)}
+                    onSelect={(date) => {
+                      if (date) {
+                        handleChange("checkInDate", date)
+                        setCheckInOpen(false)
+                      }
+                    }}
+                    disabled={(date) => date < new Date()}
                     initialFocus
                   />
                 </PopoverContent>
@@ -217,8 +227,8 @@ export function ReservationForm({ isOpen, onClose, onSubmit, reservation }: Rese
             </div>
 
             <div className="space-y-2">
-              <Label>Check-out Date</Label>
-              <Popover>
+              <Label>Check-out Date *</Label>
+              <Popover open={checkOutOpen} onOpenChange={setCheckOutOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
@@ -235,7 +245,13 @@ export function ReservationForm({ isOpen, onClose, onSubmit, reservation }: Rese
                   <Calendar
                     mode="single"
                     selected={formData.checkOutDate}
-                    onSelect={(date) => date && handleChange("checkOutDate", date)}
+                    onSelect={(date) => {
+                      if (date) {
+                        handleChange("checkOutDate", date)
+                        setCheckOutOpen(false)
+                      }
+                    }}
+                    disabled={(date) => date <= formData.checkInDate}
                     initialFocus
                   />
                 </PopoverContent>
@@ -245,7 +261,7 @@ export function ReservationForm({ isOpen, onClose, onSubmit, reservation }: Rese
 
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="adults">Adults</Label>
+              <Label htmlFor="adults">Adults *</Label>
               <Input
                 id="adults"
                 type="number"
@@ -290,6 +306,7 @@ export function ReservationForm({ isOpen, onClose, onSubmit, reservation }: Rese
               value={formData.specialRequests}
               onChange={(e) => handleChange("specialRequests", e.target.value)}
               placeholder="Any special requests or notes..."
+              rows={3}
             />
           </div>
 
@@ -297,7 +314,7 @@ export function ReservationForm({ isOpen, onClose, onSubmit, reservation }: Rese
             <div className="p-4 bg-gray-50 rounded-lg">
               <div className="flex justify-between items-center">
                 <span className="font-medium">Total Amount:</span>
-                <span className="text-2xl font-bold text-[#468DD6]">${totalAmount.toFixed(2)}</span>
+                <span className="text-2xl font-bold text-[#468DD6]">₦{totalAmount.toLocaleString()}</span>
               </div>
               <div className="text-sm text-gray-600 mt-1">
                 {Math.ceil((formData.checkOutDate.getTime() - formData.checkInDate.getTime()) / (1000 * 60 * 60 * 24))}{" "}

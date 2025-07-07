@@ -88,6 +88,43 @@ export function useRooms() {
     }
   }
 
+  const getRoomById = async (id: string) => {
+    try {
+      const response = await fetch(`/api/rooms/${id}`)
+      if (!response.ok) {
+        throw new Error("Failed to fetch room")
+      }
+      return await response.json()
+    } catch (err) {
+      throw err
+    }
+  }
+
+  const getAvailableRooms = (checkIn: Date, checkOut: Date) => {
+    // This would typically check against reservations
+    // For now, return rooms that are available
+    return rooms.filter((room) => room.status === "available")
+  }
+
+  const getRoomsByStatus = (status: string) => {
+    return rooms.filter((room) => room.status === status)
+  }
+
+  const getRoomsByType = (type: string) => {
+    return rooms.filter((room) => room.type === type)
+  }
+
+  const getRoomStats = () => {
+    return {
+      total: rooms.length,
+      available: rooms.filter((r) => r.status === "available").length,
+      occupied: rooms.filter((r) => r.status === "occupied").length,
+      maintenance: rooms.filter((r) => r.status === "maintenance").length,
+      cleaning: rooms.filter((r) => r.status === "cleaning").length,
+      occupancyRate: rooms.length > 0 ? (rooms.filter((r) => r.status === "occupied").length / rooms.length) * 100 : 0,
+    }
+  }
+
   useEffect(() => {
     fetchRooms()
   }, [])
@@ -100,5 +137,10 @@ export function useRooms() {
     createRoom,
     updateRoom,
     deleteRoom,
+    getRoomById,
+    getAvailableRooms,
+    getRoomsByStatus,
+    getRoomsByType,
+    getRoomStats,
   }
 }

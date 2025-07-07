@@ -5,17 +5,19 @@ import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { DataTable } from "@/components/shared/DataTable"
-import { formatCurrency } from "@/lib/utils"
-import { Plus, Edit, Trash2, User, Mail, Phone, MapPin } from "lucide-react"
+import { formatCurrency, formatDate } from "@/lib/utils"
+import { Plus, Edit, Trash2, User, Users, UserPlus, Crown } from "lucide-react"
 import { GuestForm } from "@/components/guests/GuestForm"
 import { useToast } from "@/hooks/use-toast"
 import type { Guest } from "@/lib/models/Guest"
 
 const columns = [
   { key: "name", label: "Name", sortable: true },
-  { key: "contact", label: "Contact", sortable: true },
-  { key: "address", label: "Address", sortable: true },
-  { key: "stats", label: "Stats", sortable: true },
+  { key: "email", label: "Email", sortable: true },
+  { key: "phone", label: "Phone", sortable: true },
+  { key: "nationality", label: "Nationality", sortable: true },
+  { key: "totalStays", label: "Stays", sortable: true },
+  { key: "totalSpent", label: "Total Spent", sortable: true },
   { key: "actions", label: "Actions", sortable: false },
 ]
 
@@ -24,11 +26,21 @@ export default function GuestsPage() {
   const [loading, setLoading] = useState(true)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingGuest, setEditingGuest] = useState<Guest | null>(null)
+  const [stats, setStats] = useState({
+    total: 0,
+    active: 0,
+    new: 0,
+    vip: 0,
+  })
   const { toast } = useToast()
 
   useEffect(() => {
     fetchGuests()
   }, [])
+
+  useEffect(() => {
+    calculateStats()
+  }, [guests])
 
   const fetchGuests = async () => {
     try {
@@ -48,6 +60,24 @@ export default function GuestsPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const calculateStats = () => {
+    const now = new Date()
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+    const stats = guests.reduce(
+      (acc, guest) => {
+        acc.total++
+        if (guest.totalStays > 0) acc.active++
+        if (new Date(guest.createdAt || now) > thirtyDaysAgo) acc.new++
+        if (guest.totalSpent > 100000) acc.vip++ // VIP if spent more than 100k
+        return acc
+      },
+      { total: 0, active: 0, new: 0, vip: 0 },
+    )
+
+    setStats(stats)
   }
 
   const handleCreateGuest = async (guestData: any) => {
@@ -147,44 +177,37 @@ export default function GuestsPage() {
       case "name":
         return (
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-[#468DD6] rounded-full flex items-center justify-center">
-              <User className="h-5 w-5 text-white" />
+            <div className="w-8 h-8 bg-[#468DD6] rounded-full flex items-center justify-center">
+              <span className="text-white text-sm font-medium">{guest.name.charAt(0)}</span>
             </div>
             <div>
               <div className="font-medium">{guest.name}</div>
-              <div className="text-sm text-gray-500">ID: {guest.idNumber}</div>
+              <div className="text-sm text-gray-500">ID: {guest.idNumber || "N/A"}</div>
             </div>
           </div>
         )
-      case "contact":
+      case "email":
         return (
-          <div className="space-y-1">
-            <div className="flex items-center space-x-2">
-              <Mail className="h-4 w-4 text-gray-400" />
-              <span className="text-sm">{guest.email}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Phone className="h-4 w-4 text-gray-400" />
-              <span className="text-sm">{guest.phone}</span>
+          <div>
+            <div className="font-medium">{guest.email}</div>
+            <div className="text-sm text-gray-500">
+              {guest.dateOfBirth ? formatDate(guest.dateOfBirth) : "DOB not set"}
             </div>
           </div>
         )
-      case "address":
-        return (
-          <div className="flex items-center space-x-2">
-            <MapPin className="h-4 w-4 text-gray-400" />
-            <span className="text-sm">{guest.address}</span>
-          </div>
-        )
-      case "stats":
+      case "phone":
+        return <span className="font-medium">{guest.phone}</span>
+      case "nationality":
+        return <span className="capitalize">{guest.nationality || "Not specified"}</span>
+      case "totalStays":
         return (
           <div className="text-center">
-            <div className="font-medium">{guest.totalStays || 0}</div>
-            <div className="text-sm text-gray-500">Stays</div>
-            <div className="font-medium">{formatCurrency(guest.totalSpent || 0)}</div>
-            <div className="text-sm text-gray-500">Spent</div>
+            <div className="font-medium">{guest.totalStays}</div>
+            <div className="text-sm text-gray-500">stays</div>
           </div>
         )
+      case "totalSpent":
+        return <span className="font-medium">{formatCurrency(guest.totalSpent)}</span>
       case "actions":
         return (
           <div className="flex space-x-1">
@@ -226,7 +249,7 @@ export default function GuestsPage() {
       >
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Guest Registry</h1>
-          <p className="text-gray-600 dark:text-gray-400">Manage guest information and profiles</p>
+          <p className="text-gray-600 dark:text-gray-400">Manage hotel guests and their information</p>
         </div>
         <Button
           className="bg-[#1B2A41] hover:bg-[#1B2A41]/90"
@@ -250,10 +273,10 @@ export default function GuestsPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <User className="h-5 w-5 text-[#468DD6]" />
+              <Users className="h-5 w-5 text-[#468DD6]" />
               <div>
                 <p className="text-sm text-gray-600">Total Guests</p>
-                <p className="text-2xl font-bold">{guests.length}</p>
+                <p className="text-2xl font-bold">{stats.total}</p>
               </div>
             </div>
           </CardContent>
@@ -265,7 +288,7 @@ export default function GuestsPage() {
               <User className="h-5 w-5 text-green-500" />
               <div>
                 <p className="text-sm text-gray-600">Active Guests</p>
-                <p className="text-2xl font-bold">{guests.filter((g) => (g.totalStays || 0) > 0).length}</p>
+                <p className="text-2xl font-bold">{stats.active}</p>
               </div>
             </div>
           </CardContent>
@@ -274,10 +297,10 @@ export default function GuestsPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <User className="h-5 w-5 text-yellow-500" />
+              <UserPlus className="h-5 w-5 text-blue-500" />
               <div>
                 <p className="text-sm text-gray-600">New Guests</p>
-                <p className="text-2xl font-bold">{guests.filter((g) => (g.totalStays || 0) === 0).length}</p>
+                <p className="text-2xl font-bold">{stats.new}</p>
               </div>
             </div>
           </CardContent>
@@ -286,10 +309,10 @@ export default function GuestsPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <User className="h-5 w-5 text-purple-500" />
+              <Crown className="h-5 w-5 text-yellow-500" />
               <div>
                 <p className="text-sm text-gray-600">VIP Guests</p>
-                <p className="text-2xl font-bold">{guests.filter((g) => (g.totalStays || 0) >= 5).length}</p>
+                <p className="text-2xl font-bold">{stats.vip}</p>
               </div>
             </div>
           </CardContent>

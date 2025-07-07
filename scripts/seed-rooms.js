@@ -1,125 +1,93 @@
 const { MongoClient } = require("mongodb")
 
-const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/hotel-management"
+const uri = process.env.MONGODB_URI
 
 const sampleRooms = [
   {
     number: "101",
     type: "standard",
-    price: 150,
+    price: 25000,
     capacity: 2,
-    amenities: ["wifi", "tv", "ac", "minibar"],
+    amenities: ["WiFi", "TV", "AC", "Mini Fridge"],
     status: "available",
-    floor: 1,
-    description: "Comfortable standard room with city view",
+    description: "Comfortable standard room with modern amenities",
     createdAt: new Date(),
     updatedAt: new Date(),
   },
   {
     number: "102",
     type: "standard",
-    price: 150,
+    price: 25000,
     capacity: 2,
-    amenities: ["wifi", "tv", "ac", "minibar"],
+    amenities: ["WiFi", "TV", "AC", "Mini Fridge"],
     status: "available",
-    floor: 1,
-    description: "Comfortable standard room with garden view",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    number: "103",
-    type: "deluxe",
-    price: 250,
-    capacity: 3,
-    amenities: ["wifi", "tv", "ac", "minibar", "balcony", "room-service"],
-    status: "available",
-    floor: 1,
-    description: "Spacious deluxe room with balcony and premium amenities",
+    description: "Comfortable standard room with modern amenities",
     createdAt: new Date(),
     updatedAt: new Date(),
   },
   {
     number: "201",
     type: "deluxe",
-    price: 280,
+    price: 40000,
     capacity: 3,
-    amenities: ["wifi", "tv", "ac", "minibar", "balcony", "room-service"],
-    status: "occupied",
-    floor: 2,
-    description: "Premium deluxe room with ocean view",
+    amenities: ["WiFi", "TV", "AC", "Mini Fridge", "Balcony", "Room Service"],
+    status: "available",
+    description: "Spacious deluxe room with balcony and premium amenities",
     createdAt: new Date(),
     updatedAt: new Date(),
   },
   {
     number: "202",
-    type: "suite",
-    price: 450,
-    capacity: 4,
-    amenities: ["wifi", "tv", "ac", "minibar", "balcony", "room-service", "jacuzzi", "kitchenette"],
-    status: "available",
-    floor: 2,
-    description: "Luxury suite with separate living area and premium amenities",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    number: "203",
-    type: "suite",
-    price: 500,
-    capacity: 4,
-    amenities: ["wifi", "tv", "ac", "minibar", "balcony", "room-service", "jacuzzi", "kitchenette"],
-    status: "cleaning",
-    floor: 2,
-    description: "Presidential suite with panoramic city view",
+    type: "deluxe",
+    price: 40000,
+    capacity: 3,
+    amenities: ["WiFi", "TV", "AC", "Mini Fridge", "Balcony", "Room Service"],
+    status: "occupied",
+    description: "Spacious deluxe room with balcony and premium amenities",
     createdAt: new Date(),
     updatedAt: new Date(),
   },
   {
     number: "301",
-    type: "standard",
-    price: 180,
-    capacity: 2,
-    amenities: ["wifi", "tv", "ac", "minibar"],
+    type: "suite",
+    price: 75000,
+    capacity: 4,
+    amenities: ["WiFi", "TV", "AC", "Mini Fridge", "Balcony", "Room Service", "Jacuzzi", "Living Area"],
     status: "available",
-    floor: 3,
-    description: "Standard room with premium location",
+    description: "Luxury suite with separate living area and premium amenities",
     createdAt: new Date(),
     updatedAt: new Date(),
   },
   {
     number: "302",
-    type: "deluxe",
-    price: 320,
-    capacity: 3,
-    amenities: ["wifi", "tv", "ac", "minibar", "balcony", "room-service"],
-    status: "maintenance",
-    floor: 3,
-    description: "Deluxe room currently under maintenance",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    number: "303",
-    type: "standard",
-    price: 180,
-    capacity: 2,
-    amenities: ["wifi", "tv", "ac", "minibar"],
-    status: "available",
-    floor: 3,
-    description: "Cozy standard room with modern amenities",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    number: "401",
     type: "suite",
-    price: 600,
-    capacity: 6,
-    amenities: ["wifi", "tv", "ac", "minibar", "balcony", "room-service", "jacuzzi", "kitchenette", "dining-area"],
+    price: 75000,
+    capacity: 4,
+    amenities: ["WiFi", "TV", "AC", "Mini Fridge", "Balcony", "Room Service", "Jacuzzi", "Living Area"],
+    status: "maintenance",
+    description: "Luxury suite with separate living area and premium amenities",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    number: "103",
+    type: "standard",
+    price: 25000,
+    capacity: 2,
+    amenities: ["WiFi", "TV", "AC", "Mini Fridge"],
+    status: "cleaning",
+    description: "Comfortable standard room with modern amenities",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    number: "203",
+    type: "deluxe",
+    price: 40000,
+    capacity: 3,
+    amenities: ["WiFi", "TV", "AC", "Mini Fridge", "Balcony", "Room Service"],
     status: "available",
-    floor: 4,
-    description: "Penthouse suite with luxury amenities and city skyline view",
+    description: "Spacious deluxe room with balcony and premium amenities",
     createdAt: new Date(),
     updatedAt: new Date(),
   },
@@ -143,11 +111,17 @@ async function seedRooms() {
     const result = await collection.insertMany(sampleRooms)
     console.log(`Inserted ${result.insertedCount} rooms`)
 
-    console.log("Room seeding completed successfully!")
+    // Display inserted rooms
+    const rooms = await collection.find({}).toArray()
+    console.log("\nInserted rooms:")
+    rooms.forEach((room) => {
+      console.log(`- Room ${room.number} (${room.type}) - ${room.status} - ₦${room.price.toLocaleString()}/night`)
+    })
   } catch (error) {
     console.error("Error seeding rooms:", error)
   } finally {
     await client.close()
+    console.log("\nDisconnected from MongoDB")
   }
 }
 

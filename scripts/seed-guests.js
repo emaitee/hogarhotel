@@ -1,109 +1,80 @@
 const { MongoClient } = require("mongodb")
 
-const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/hotel-management"
+const uri = process.env.MONGODB_URI
 
 const sampleGuests = [
   {
     name: "John Smith",
     email: "john.smith@email.com",
-    phone: "+1-555-0101",
-    address: "123 Main Street, New York, NY 10001",
-    idNumber: "ID001234567",
-    nationality: "American",
+    phone: "+234-801-234-5678",
+    address: "123 Victoria Island, Lagos, Nigeria",
+    nationality: "Nigeria",
     dateOfBirth: new Date("1985-06-15"),
+    idNumber: "A12345678",
+    emergencyContact: "Jane Smith - +234-802-345-6789",
+    specialRequests: "Vegetarian meals preferred",
     totalStays: 3,
-    totalSpent: 1250.0,
+    totalSpent: 150000,
     createdAt: new Date(),
     updatedAt: new Date(),
   },
   {
     name: "Sarah Johnson",
     email: "sarah.johnson@email.com",
-    phone: "+1-555-0102",
-    address: "456 Oak Avenue, Los Angeles, CA 90210",
-    idNumber: "ID001234568",
-    nationality: "American",
+    phone: "+234-803-456-7890",
+    address: "456 Ikoyi, Lagos, Nigeria",
+    nationality: "United States",
     dateOfBirth: new Date("1990-03-22"),
+    idNumber: "US987654321",
+    emergencyContact: "Mike Johnson - +1-555-123-4567",
+    specialRequests: "Late check-out preferred",
     totalStays: 1,
-    totalSpent: 450.0,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    name: "Michael Brown",
-    email: "michael.brown@email.com",
-    phone: "+1-555-0103",
-    address: "789 Pine Street, Chicago, IL 60601",
-    idNumber: "ID001234569",
-    nationality: "American",
-    dateOfBirth: new Date("1978-11-08"),
-    totalStays: 5,
-    totalSpent: 2100.0,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    name: "Emily Davis",
-    email: "emily.davis@email.com",
-    phone: "+1-555-0104",
-    address: "321 Elm Street, Miami, FL 33101",
-    idNumber: "ID001234570",
-    nationality: "American",
-    dateOfBirth: new Date("1992-07-14"),
-    totalStays: 2,
-    totalSpent: 800.0,
+    totalSpent: 75000,
     createdAt: new Date(),
     updatedAt: new Date(),
   },
   {
     name: "David Wilson",
     email: "david.wilson@email.com",
-    phone: "+1-555-0105",
-    address: "654 Maple Drive, Seattle, WA 98101",
-    idNumber: "ID001234571",
-    nationality: "American",
-    dateOfBirth: new Date("1983-12-03"),
-    totalStays: 0,
-    totalSpent: 0.0,
+    phone: "+234-805-678-9012",
+    address: "789 Lekki Phase 1, Lagos, Nigeria",
+    nationality: "United Kingdom",
+    dateOfBirth: new Date("1978-11-08"),
+    idNumber: "UK456789123",
+    emergencyContact: "Emma Wilson - +44-20-7946-0958",
+    specialRequests: "Ground floor room preferred",
+    totalStays: 5,
+    totalSpent: 300000,
     createdAt: new Date(),
     updatedAt: new Date(),
   },
   {
-    name: "Lisa Anderson",
-    email: "lisa.anderson@email.com",
-    phone: "+1-555-0106",
-    address: "987 Cedar Lane, Boston, MA 02101",
-    idNumber: "ID001234572",
-    nationality: "American",
-    dateOfBirth: new Date("1988-04-18"),
+    name: "Maria Garcia",
+    email: "maria.garcia@email.com",
+    phone: "+234-807-890-1234",
+    address: "321 Surulere, Lagos, Nigeria",
+    nationality: "Spain",
+    dateOfBirth: new Date("1992-09-14"),
+    idNumber: "ES789123456",
+    emergencyContact: "Carlos Garcia - +34-91-123-4567",
+    specialRequests: "Extra towels and pillows",
+    totalStays: 2,
+    totalSpent: 120000,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    name: "Ahmed Hassan",
+    email: "ahmed.hassan@email.com",
+    phone: "+234-809-012-3456",
+    address: "654 Ikeja, Lagos, Nigeria",
+    nationality: "Nigeria",
+    dateOfBirth: new Date("1988-12-03"),
+    idNumber: "A98765432",
+    emergencyContact: "Fatima Hassan - +234-810-123-4567",
+    specialRequests: "Halal meals only",
     totalStays: 4,
-    totalSpent: 1600.0,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    name: "James Taylor",
-    email: "james.taylor@email.com",
-    phone: "+1-555-0107",
-    address: "147 Birch Street, Denver, CO 80201",
-    idNumber: "ID001234573",
-    nationality: "American",
-    dateOfBirth: new Date("1975-09-25"),
-    totalStays: 7,
-    totalSpent: 3150.0,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    name: "Jennifer Martinez",
-    email: "jennifer.martinez@email.com",
-    phone: "+1-555-0108",
-    address: "258 Spruce Avenue, Phoenix, AZ 85001",
-    idNumber: "ID001234574",
-    nationality: "American",
-    dateOfBirth: new Date("1991-01-12"),
-    totalStays: 1,
-    totalSpent: 350.0,
+    totalSpent: 200000,
     createdAt: new Date(),
     updatedAt: new Date(),
   },
@@ -127,11 +98,17 @@ async function seedGuests() {
     const result = await collection.insertMany(sampleGuests)
     console.log(`Inserted ${result.insertedCount} guests`)
 
-    console.log("Guest seeding completed successfully!")
+    // Display inserted guests
+    const guests = await collection.find({}).toArray()
+    console.log("\nInserted guests:")
+    guests.forEach((guest) => {
+      console.log(`- ${guest.name} (${guest.email})`)
+    })
   } catch (error) {
     console.error("Error seeding guests:", error)
   } finally {
     await client.close()
+    console.log("\nDisconnected from MongoDB")
   }
 }
 

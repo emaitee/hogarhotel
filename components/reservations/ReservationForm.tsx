@@ -7,13 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon } from "lucide-react"
-import { format } from "date-fns"
-import { cn } from "@/lib/utils"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { Reservation } from "@/lib/models/Reservation"
 import type { Guest } from "@/lib/models/Guest"
 import type { Room } from "@/lib/models/Room"
@@ -29,19 +24,17 @@ export function ReservationForm({ isOpen, onClose, onSubmit, reservation }: Rese
   const [formData, setFormData] = useState({
     guestId: "",
     roomId: "",
-    checkInDate: new Date(),
-    checkOutDate: new Date(),
+    checkInDate: "",
+    checkOutDate: "",
     adults: 1,
     children: 0,
     specialRequests: "",
-    status: "confirmed" as const,
+    status: "confirmed",
   })
   const [guests, setGuests] = useState<Guest[]>([])
   const [rooms, setRooms] = useState<Room[]>([])
-  const [loading, setLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [totalAmount, setTotalAmount] = useState(0)
-  const [checkInOpen, setCheckInOpen] = useState(false)
-  const [checkOutOpen, setCheckOutOpen] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -54,39 +47,35 @@ export function ReservationForm({ isOpen, onClose, onSubmit, reservation }: Rese
     if (reservation) {
       setFormData({
         guestId:
-          typeof reservation.guest === "object" ? reservation.guest._id!.toString() : reservation.guest.toString(),
-        roomId: typeof reservation.room === "object" ? reservation.room._id!.toString() : reservation.room.toString(),
-        checkInDate: new Date(reservation.checkInDate),
-        checkOutDate: new Date(reservation.checkOutDate),
+          typeof reservation.guest === "object"
+            ? reservation.guest._id?.toString() || ""
+            : reservation.guest.toString(),
+        roomId:
+          typeof reservation.room === "object" ? reservation.room._id?.toString() || "" : reservation.room.toString(),
+        checkInDate: new Date(reservation.checkInDate).toISOString().split("T")[0],
+        checkOutDate: new Date(reservation.checkOutDate).toISOString().split("T")[0],
         adults: reservation.adults,
         children: reservation.children,
         specialRequests: reservation.specialRequests || "",
         status: reservation.status,
       })
-      setTotalAmount(reservation.totalAmount)
     } else {
-      const tomorrow = new Date()
-      tomorrow.setDate(tomorrow.getDate() + 1)
-      const dayAfter = new Date()
-      dayAfter.setDate(dayAfter.getDate() + 2)
-
       setFormData({
         guestId: "",
         roomId: "",
-        checkInDate: tomorrow,
-        checkOutDate: dayAfter,
+        checkInDate: "",
+        checkOutDate: "",
         adults: 1,
         children: 0,
         specialRequests: "",
         status: "confirmed",
       })
-      setTotalAmount(0)
     }
   }, [reservation, isOpen])
 
   useEffect(() => {
     calculateTotal()
-  }, [formData.roomId, formData.checkInDate, formData.checkOutDate, rooms])
+  }, [formData.checkInDate, formData.checkOutDate, formData.roomId, rooms])
 
   const fetchGuests = async () => {
     try {
@@ -96,7 +85,7 @@ export function ReservationForm({ isOpen, onClose, onSubmit, reservation }: Rese
         setGuests(data)
       }
     } catch (error) {
-      console.error("Failed to fetch guests:", error)
+      console.error("Error fetching guests:", error)
     }
   }
 
@@ -105,70 +94,74 @@ export function ReservationForm({ isOpen, onClose, onSubmit, reservation }: Rese
       const response = await fetch("/api/rooms")
       if (response.ok) {
         const data = await response.json()
+        // Only show available rooms
         setRooms(data.filter((room: Room) => room.status === "available"))
       }
     } catch (error) {
-      console.error("Failed to fetch rooms:", error)
+      console.error("Error fetching rooms:", error)
     }
   }
 
   const calculateTotal = () => {
-    if (!formData.roomId || !formData.checkInDate || !formData.checkOutDate) {
-      setTotalAmount(0)
-      return
-    }
+    if (formData.checkInDate && formData.checkOutDate && formData.roomId) {
+      const checkIn = new Date(formData.checkInDate)
+      const checkOut = new Date(formData.checkOutDate)
+      const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24))
 
-    const room = rooms.find((r) => r._id!.toString() === formData.roomId)
-    if (!room) {
+      const selectedRoom = rooms.find((room) => room._id?.toString() === formData.roomId)
+      if (selectedRoom && nights > 0) {
+        setTotalAmount(nights * selectedRoom.price)
+      } else {
+        setTotalAmount(0)
+      }
+    } else {
       setTotalAmount(0)
-      return
     }
-
-    const nights = Math.ceil((formData.checkOutDate.getTime() - formData.checkInDate.getTime()) / (1000 * 60 * 60 * 24))
-    const total = nights * room.price
-    setTotalAmount(total)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
+    setIsSubmitting(true)
 
     try {
-      await onSubmit({
+      const submitData = {
         ...formData,
         totalAmount,
-      })
+        adults: Number.parseInt(formData.adults.toString()),
+        children: Number.parseInt(formData.children.toString()),
+      }
+      await onSubmit(submitData)
+    } catch (error) {
+      console.error("Error submitting form:", error)
     } finally {
-      setLoading(false)
+      setIsSubmitting(false)
     }
   }
 
-  const handleChange = (field: string, value: any) => {
-    setFormData({
-      ...formData,
-      [field]: value,
-    })
+  const handleChange = (field: string, value: string | number) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
   if (!isOpen) return null
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{reservation ? "Edit Reservation" : "New Reservation"}</DialogTitle>
+          <DialogTitle>{reservation ? "Edit Reservation" : "Create New Reservation"}</DialogTitle>
         </DialogHeader>
+
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="guest">Guest *</Label>
+              <Label htmlFor="guestId">Guest *</Label>
               <Select value={formData.guestId} onValueChange={(value) => handleChange("guestId", value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a guest" />
                 </SelectTrigger>
                 <SelectContent>
                   {guests.map((guest) => (
-                    <SelectItem key={guest._id!.toString()} value={guest._id!.toString()}>
+                    <SelectItem key={guest._id?.toString()} value={guest._id?.toString() || ""}>
                       {guest.name} - {guest.email}
                     </SelectItem>
                   ))}
@@ -177,15 +170,77 @@ export function ReservationForm({ isOpen, onClose, onSubmit, reservation }: Rese
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="room">Room *</Label>
+              <Label htmlFor="roomId">Room *</Label>
               <Select value={formData.roomId} onValueChange={(value) => handleChange("roomId", value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a room" />
                 </SelectTrigger>
                 <SelectContent>
                   {rooms.map((room) => (
-                    <SelectItem key={room._id!.toString()} value={room._id!.toString()}>
+                    <SelectItem key={room._id?.toString()} value={room._id?.toString() || ""}>
                       Room {room.number} - {room.type} (₦{room.price.toLocaleString()}/night)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="checkInDate">Check-in Date *</Label>
+              <Input
+                id="checkInDate"
+                type="date"
+                value={formData.checkInDate}
+                onChange={(e) => handleChange("checkInDate", e.target.value)}
+                required
+                min={new Date().toISOString().split("T")[0]}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="checkOutDate">Check-out Date *</Label>
+              <Input
+                id="checkOutDate"
+                type="date"
+                value={formData.checkOutDate}
+                onChange={(e) => handleChange("checkOutDate", e.target.value)}
+                required
+                min={formData.checkInDate || new Date().toISOString().split("T")[0]}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="adults">Adults *</Label>
+              <Select
+                value={formData.adults.toString()}
+                onValueChange={(value) => handleChange("adults", Number.parseInt(value))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[1, 2, 3, 4, 5, 6].map((num) => (
+                    <SelectItem key={num} value={num.toString()}>
+                      {num} Adult{num > 1 ? "s" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="children">Children</Label>
+              <Select
+                value={formData.children.toString()}
+                onValueChange={(value) => handleChange("children", Number.parseInt(value))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[0, 1, 2, 3, 4].map((num) => (
+                    <SelectItem key={num} value={num.toString()}>
+                      {num} {num === 1 ? "Child" : "Children"}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -193,96 +248,7 @@ export function ReservationForm({ isOpen, onClose, onSubmit, reservation }: Rese
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Check-in Date *</Label>
-              <Popover open={checkInOpen} onOpenChange={setCheckInOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !formData.checkInDate && "text-muted-foreground",
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formData.checkInDate ? format(formData.checkInDate, "PPP") : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={formData.checkInDate}
-                    onSelect={(date) => {
-                      if (date) {
-                        handleChange("checkInDate", date)
-                        setCheckInOpen(false)
-                      }
-                    }}
-                    disabled={(date) => date < new Date()}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Check-out Date *</Label>
-              <Popover open={checkOutOpen} onOpenChange={setCheckOutOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !formData.checkOutDate && "text-muted-foreground",
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formData.checkOutDate ? format(formData.checkOutDate, "PPP") : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={formData.checkOutDate}
-                    onSelect={(date) => {
-                      if (date) {
-                        handleChange("checkOutDate", date)
-                        setCheckOutOpen(false)
-                      }
-                    }}
-                    disabled={(date) => date <= formData.checkInDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="adults">Adults *</Label>
-              <Input
-                id="adults"
-                type="number"
-                min="1"
-                value={formData.adults}
-                onChange={(e) => handleChange("adults", Number.parseInt(e.target.value))}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="children">Children</Label>
-              <Input
-                id="children"
-                type="number"
-                min="0"
-                value={formData.children}
-                onChange={(e) => handleChange("children", Number.parseInt(e.target.value))}
-              />
-            </div>
-
+          {reservation && (
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
               <Select value={formData.status} onValueChange={(value) => handleChange("status", value)}>
@@ -297,7 +263,7 @@ export function ReservationForm({ isOpen, onClose, onSubmit, reservation }: Rese
                 </SelectContent>
               </Select>
             </div>
-          </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="specialRequests">Special Requests</Label>
@@ -305,30 +271,39 @@ export function ReservationForm({ isOpen, onClose, onSubmit, reservation }: Rese
               id="specialRequests"
               value={formData.specialRequests}
               onChange={(e) => handleChange("specialRequests", e.target.value)}
-              placeholder="Any special requests or notes..."
+              placeholder="Any special requests or notes"
               rows={3}
             />
           </div>
 
           {totalAmount > 0 && (
-            <div className="p-4 bg-gray-50 rounded-lg">
+            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
               <div className="flex justify-between items-center">
                 <span className="font-medium">Total Amount:</span>
-                <span className="text-2xl font-bold text-[#468DD6]">₦{totalAmount.toLocaleString()}</span>
+                <span className="text-xl font-bold text-[#468DD6]">₦{totalAmount.toLocaleString()}</span>
               </div>
-              <div className="text-sm text-gray-600 mt-1">
-                {Math.ceil((formData.checkOutDate.getTime() - formData.checkInDate.getTime()) / (1000 * 60 * 60 * 24))}{" "}
-                nights
-              </div>
+              {formData.checkInDate && formData.checkOutDate && (
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  {Math.ceil(
+                    (new Date(formData.checkOutDate).getTime() - new Date(formData.checkInDate).getTime()) /
+                      (1000 * 60 * 60 * 24),
+                  )}{" "}
+                  night(s)
+                </div>
+              )}
             </div>
           )}
 
-          <div className="flex justify-end space-x-2">
+          <div className="flex justify-end space-x-2 pt-4">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || !formData.guestId || !formData.roomId}>
-              {loading ? "Saving..." : reservation ? "Update Reservation" : "Create Reservation"}
+            <Button
+              type="submit"
+              disabled={isSubmitting || !formData.guestId || !formData.roomId}
+              className="bg-[#1B2A41] hover:bg-[#1B2A41]/90"
+            >
+              {isSubmitting ? "Saving..." : reservation ? "Update Reservation" : "Create Reservation"}
             </Button>
           </div>
         </form>

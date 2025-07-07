@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { useAuthStore } from "@/store/authStore"
@@ -18,24 +17,20 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { isAuthenticated, checkAuth } = useAuthStore()
   const { isCollapsed } = useSidebarStore()
   const router = useRouter()
-
   const pathname = usePathname()
-    const isLoginPage = pathname === "/login"
 
   useEffect(() => {
     // Check authentication on mount
     const authenticated = checkAuth()
-    if (!authenticated) {
+    if (!authenticated && pathname !== "/login") {
       router.push("/login")
     }
-  }, [checkAuth, router])
+  }, [checkAuth, router, pathname])
 
-  // Don't render anything if not authenticated
-  if (!isAuthenticated) {
+  // Don't render anything if not authenticated and not on login page
+  if (!isAuthenticated && pathname !== "/login") {
     return null
   }
-
-  if (isLoginPage) return children
 
   return (
     <div className="flex h-screen bg-gray-50">

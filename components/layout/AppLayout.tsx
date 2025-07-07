@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useThemeStore } from '@/store/themeStore';
 import { useSidebarStore } from '@/store/sidebarStore';
 import { AuthGuard } from '@/components/auth/AuthGuard';
-import { Sidebar } from './Sidebar';
+import Sidebar from './Sidebar';
 import { Topbar } from './Topbar';
 
 interface AppLayoutProps {

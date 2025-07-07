@@ -47,6 +47,47 @@ export function useReservations() {
     }
   }
 
+  const updateReservation = async (reservationId: string, updateData: any) => {
+    try {
+      const response = await fetch(`/api/reservations/${reservationId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updateData),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to update reservation")
+      }
+
+      const updatedReservation = await response.json()
+      setReservations((prev) => prev.map((res) => (res._id === reservationId ? updatedReservation : res)))
+      return updatedReservation
+    } catch (err) {
+      throw err
+    }
+  }
+
+  const deleteReservation = async (reservationId: string) => {
+    try {
+      const response = await fetch(`/api/reservations/${reservationId}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to delete reservation")
+      }
+
+      setReservations((prev) => prev.filter((res) => res._id !== reservationId))
+      return true
+    } catch (err) {
+      throw err
+    }
+  }
+
   const checkIn = async (reservationId: string) => {
     try {
       const response = await fetch(`/api/reservations/check-in/${reservationId}`, {
@@ -85,6 +126,42 @@ export function useReservations() {
     }
   }
 
+  const getReservationById = async (reservationId: string) => {
+    try {
+      const response = await fetch(`/api/reservations/${reservationId}`)
+      if (!response.ok) {
+        throw new Error("Failed to fetch reservation")
+      }
+      return await response.json()
+    } catch (err) {
+      throw err
+    }
+  }
+
+  const getReservationsByGuest = (guestId: string) => {
+    return reservations.filter((reservation) => reservation.guestId === guestId)
+  }
+
+  const getReservationsByRoom = (roomId: string) => {
+    return reservations.filter((reservation) => reservation.roomId === roomId)
+  }
+
+  const getReservationsByStatus = (status: string) => {
+    return reservations.filter((reservation) => reservation.status === status)
+  }
+
+  const getReservationsByDateRange = (startDate: Date, endDate: Date) => {
+    return reservations.filter((reservation) => {
+      const checkIn = new Date(reservation.checkInDate)
+      const checkOut = new Date(reservation.checkOutDate)
+      return (
+        (checkIn >= startDate && checkIn <= endDate) ||
+        (checkOut >= startDate && checkOut <= endDate) ||
+        (checkIn <= startDate && checkOut >= endDate)
+      )
+    })
+  }
+
   useEffect(() => {
     fetchReservations()
   }, [])
@@ -95,7 +172,14 @@ export function useReservations() {
     error,
     fetchReservations,
     createReservation,
+    updateReservation,
+    deleteReservation,
     checkIn,
     checkOut,
+    getReservationById,
+    getReservationsByGuest,
+    getReservationsByRoom,
+    getReservationsByStatus,
+    getReservationsByDateRange,
   }
 }

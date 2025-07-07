@@ -6,6 +6,9 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
+    "seed:all": "npm run seed:rooms && npm run seed:guests && npm run seed:reservations",
+    "seed:guests": "node scripts/seed-guests.js",
+    "seed:reservations": "node scripts/seed-reservations.js",
     "seed:rooms": "node scripts/seed-rooms.js",
     "start": "next start"
   },
@@ -72,6 +75,7 @@
     "sonner": "latest",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
+    "typescript": "^5",
     "use-sync-external-store": "latest",
     "vaul": "latest",
     "zod": "latest",

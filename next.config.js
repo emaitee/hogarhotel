@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "export",
+  // --- Build–time options -----------------------------------------------
+  // Removing `output: 'export'` so dynamic API routes are allowed
+  // -----------------------------------------------------------------------
 
   // Skip ESLint errors during production builds
   eslint: {
@@ -12,7 +14,7 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
 
-  // Disable next/image optimizations (required when using output: 'export')
+  // Disable next/image optimizations (optional—but harmless without `output: 'export'`)
   images: {
     unoptimized: true,
   },

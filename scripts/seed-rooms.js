@@ -1,100 +1,120 @@
 const { MongoClient } = require("mongodb")
 
-const uri = process.env.MONGODB_URI || "mongodb://localhost:27017"
-const dbName = "hotel_management"
+const uri = process.env.MONGODB_URI
+const client = new MongoClient(uri)
 
 const sampleRooms = [
   {
     number: "101",
-    floor: 1,
-    type: "standard",
+    type: "Standard",
+    price: 120.0,
+    capacity: 2,
+    amenities: ["WiFi", "TV", "Air Conditioning", "Private Bathroom"],
     status: "available",
-    price: 99.99,
-    amenities: ["WiFi", "TV", "AC"],
+    description: "Comfortable standard room with modern amenities",
     createdAt: new Date(),
     updatedAt: new Date(),
   },
   {
     number: "102",
-    floor: 1,
-    type: "standard",
-    status: "occupied",
-    price: 99.99,
-    amenities: ["WiFi", "TV", "AC"],
+    type: "Standard",
+    price: 120.0,
+    capacity: 2,
+    amenities: ["WiFi", "TV", "Air Conditioning", "Private Bathroom"],
+    status: "available",
+    description: "Comfortable standard room with modern amenities",
     createdAt: new Date(),
     updatedAt: new Date(),
   },
   {
     number: "201",
-    floor: 2,
-    type: "deluxe",
+    type: "Deluxe",
+    price: 180.0,
+    capacity: 3,
+    amenities: ["WiFi", "TV", "Air Conditioning", "Private Bathroom", "Mini Bar", "Balcony"],
     status: "available",
-    price: 149.99,
-    amenities: ["WiFi", "TV", "AC", "Minibar", "Balcony"],
+    description: "Spacious deluxe room with premium amenities and city view",
     createdAt: new Date(),
     updatedAt: new Date(),
   },
   {
     number: "202",
-    floor: 2,
-    type: "deluxe",
-    status: "cleaning",
-    price: 149.99,
-    amenities: ["WiFi", "TV", "AC", "Minibar", "Balcony"],
-    lastCleaned: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
+    type: "Deluxe",
+    price: 180.0,
+    capacity: 3,
+    amenities: ["WiFi", "TV", "Air Conditioning", "Private Bathroom", "Mini Bar", "Balcony"],
+    status: "occupied",
+    description: "Spacious deluxe room with premium amenities and city view",
     createdAt: new Date(),
     updatedAt: new Date(),
   },
   {
     number: "301",
-    floor: 3,
-    type: "suite",
+    type: "Suite",
+    price: 350.0,
+    capacity: 4,
+    amenities: ["WiFi", "TV", "Air Conditioning", "Private Bathroom", "Mini Bar", "Balcony", "Living Area", "Kitchen"],
     status: "available",
-    price: 299.99,
-    amenities: ["WiFi", "TV", "AC", "Minibar", "Balcony", "Jacuzzi", "Room Service"],
+    description: "Luxurious suite with separate living area and premium amenities",
     createdAt: new Date(),
     updatedAt: new Date(),
   },
   {
     number: "302",
-    floor: 3,
-    type: "suite",
+    type: "Suite",
+    price: 350.0,
+    capacity: 4,
+    amenities: ["WiFi", "TV", "Air Conditioning", "Private Bathroom", "Mini Bar", "Balcony", "Living Area", "Kitchen"],
+    status: "cleaning",
+    description: "Luxurious suite with separate living area and premium amenities",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    number: "103",
+    type: "Standard",
+    price: 120.0,
+    capacity: 2,
+    amenities: ["WiFi", "TV", "Air Conditioning", "Private Bathroom"],
     status: "maintenance",
-    price: 299.99,
-    amenities: ["WiFi", "TV", "AC", "Minibar", "Balcony", "Jacuzzi", "Room Service"],
+    description: "Comfortable standard room with modern amenities",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    number: "203",
+    type: "Deluxe",
+    price: 180.0,
+    capacity: 3,
+    amenities: ["WiFi", "TV", "Air Conditioning", "Private Bathroom", "Mini Bar", "Balcony"],
+    status: "available",
+    description: "Spacious deluxe room with premium amenities and city view",
     createdAt: new Date(),
     updatedAt: new Date(),
   },
 ]
 
 async function seedRooms() {
-  const client = new MongoClient(uri)
-
   try {
     await client.connect()
     console.log("Connected to MongoDB")
 
-    const db = client.db(dbName)
-    const roomsCollection = db.collection("rooms")
+    const db = client.db()
+    const collection = db.collection("rooms")
 
     // Clear existing rooms
-    await roomsCollection.deleteMany({})
+    await collection.deleteMany({})
     console.log("Cleared existing rooms")
 
     // Insert sample rooms
-    const result = await roomsCollection.insertMany(sampleRooms)
+    const result = await collection.insertMany(sampleRooms)
     console.log(`Inserted ${result.insertedCount} rooms`)
 
-    // Create indexes
-    await roomsCollection.createIndex({ number: 1 }, { unique: true })
-    await roomsCollection.createIndex({ status: 1 })
-    await roomsCollection.createIndex({ type: 1 })
-    console.log("Created indexes")
+    console.log("Room seeding completed successfully!")
   } catch (error) {
     console.error("Error seeding rooms:", error)
   } finally {
     await client.close()
-    console.log("Disconnected from MongoDB")
   }
 }
 

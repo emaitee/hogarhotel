@@ -1,173 +1,290 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { DataTable } from "@/components/shared/DataTable"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { useReservations } from "@/hooks/useReservations"
-import { formatCurrency } from "@/lib/utils"
-import { Plus, Edit, Trash2, Loader2, UserCheck, UserX } from "lucide-react"
-import { format } from "date-fns"
+import { formatCurrency, formatDate } from "@/lib/utils"
+import { Plus, Edit, Trash2, LogIn, LogOut, Calendar, Users, Clock } from "lucide-react"
 import { ReservationForm } from "@/components/reservations/ReservationForm"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { toast } from "sonner"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useToast } from "@/hooks/use-toast"
+import type { Reservation } from "@/lib/models/Reservation"
 
 const columns = [
-  { key: "guest.name", label: "Guest Name", sortable: true },
-  { key: "room.number", label: "Room", sortable: true },
-  { key: "checkInDate", label: "Check In", sortable: true },
-  { key: "checkOutDate", label: "Check Out", sortable: true },
+  { key: "guest", label: "Guest", sortable: true },
+  { key: "room", label: "Room", sortable: true },
+  { key: "dates", label: "Check-in / Check-out", sortable: true },
+  { key: "guests", label: "Guests", sortable: true },
+  { key: "total", label: "Total", sortable: true },
   { key: "status", label: "Status", sortable: true },
-  { key: "totalAmount", label: "Total Amount", sortable: true },
   { key: "actions", label: "Actions", sortable: false },
 ]
 
 export default function ReservationsPage() {
-  const {
-    reservations,
-    loading,
-    error,
-    createReservation,
-    updateReservation,
-    deleteReservationHook,
-    checkIn,
-    checkOut,
-  } = useReservations()
+  const [reservations, setReservations] = useState<Reservation[]>([])
+  const [loading, setLoading] = useState(true)
   const [isFormOpen, setIsFormOpen] = useState(false)
-  const [editingReservation, setEditingReservation] = useState<any>(null)
-  const [deletingReservation, setDeletingReservation] = useState<any>(null)
-  const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  const filteredReservations = reservations.filter((reservation) => {
-    if (statusFilter === "all") return true
-    return reservation.status === statusFilter
+  const [editingReservation, setEditingReservation] = useState<Reservation | null>(null)
+  const [stats, setStats] = useState({
+    total: 0,
+    confirmed: 0,
+    checkedIn: 0,
+    checkedOut: 0,
+    cancelled: 0,
   })
+  const { toast } = useToast()
 
-  const handleCreateReservation = async (data: any) => {
+  useEffect(() => {
+    fetchReservations()
+  }, [])
+
+  useEffect(() => {
+    calculateStats()
+  }, [reservations])
+
+  const fetchReservations = async () => {
     try {
-      setIsSubmitting(true)
-      await createReservation(data)
-      setIsFormOpen(false)
-      toast.success("Reservation created successfully!")
-    } catch (error: any) {
-      toast.error(error.message || "Failed to create reservation")
+      const response = await fetch("/api/reservations")
+      if (response.ok) {
+        const data = await response.json()
+        setReservations(data)
+      } else {
+        throw new Error("Failed to fetch reservations")
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch reservations",
+        variant: "destructive",
+      })
     } finally {
-      setIsSubmitting(false)
+      setLoading(false)
     }
   }
 
-  const handleUpdateReservation = async (data: any) => {
+  const calculateStats = () => {
+    const stats = reservations.reduce(
+      (acc, reservation) => {
+        acc.total++
+        switch (reservation.status) {
+          case "confirmed":
+            acc.confirmed++
+            break
+          case "checked-in":
+            acc.checkedIn++
+            break
+          case "checked-out":
+            acc.checkedOut++
+            break
+          case "cancelled":
+            acc.cancelled++
+            break
+        }
+        return acc
+      },
+      { total: 0, confirmed: 0, checkedIn: 0, checkedOut: 0, cancelled: 0 },
+    )
+
+    setStats(stats)
+  }
+
+  const handleCreateReservation = async (reservationData: any) => {
     try {
-      setIsSubmitting(true)
-      await updateReservation(editingReservation._id, data)
-      setEditingReservation(null)
-      toast.success("Reservation updated successfully!")
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update reservation")
-    } finally {
-      setIsSubmitting(false)
+      const response = await fetch("/api/reservations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(reservationData),
+      })
+
+      if (response.ok) {
+        const newReservation = await response.json()
+        setReservations([...reservations, newReservation])
+        setIsFormOpen(false)
+        toast({
+          title: "Success",
+          description: "Reservation created successfully",
+        })
+      } else {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to create reservation")
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create reservation",
+        variant: "destructive",
+      })
     }
   }
 
-  const handleDeleteReservation = async () => {
+  const handleUpdateReservation = async (reservationData: any) => {
+    if (!editingReservation) return
+
     try {
-      await deleteReservationHook(deletingReservation._id)
-      setDeletingReservation(null)
-      toast.success("Reservation deleted successfully!")
-    } catch (error: any) {
-      toast.error(error.message || "Failed to delete reservation")
+      const response = await fetch(`/api/reservations/${editingReservation._id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(reservationData),
+      })
+
+      if (response.ok) {
+        const updatedReservation = await response.json()
+        setReservations(reservations.map((r) => (r._id === editingReservation._id ? updatedReservation : r)))
+        setEditingReservation(null)
+        setIsFormOpen(false)
+        toast({
+          title: "Success",
+          description: "Reservation updated successfully",
+        })
+      } else {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to update reservation")
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update reservation",
+        variant: "destructive",
+      })
     }
   }
 
-  const handleCheckIn = async (reservation: any) => {
+  const handleDeleteReservation = async (reservationId: string) => {
+    if (!confirm("Are you sure you want to delete this reservation?")) return
+
     try {
-      await checkIn(reservation._id)
-      toast.success(`${reservation.guest.name} checked in successfully!`)
-    } catch (error: any) {
-      toast.error(error.message || "Failed to check in")
+      const response = await fetch(`/api/reservations/${reservationId}`, {
+        method: "DELETE",
+      })
+
+      if (response.ok) {
+        setReservations(reservations.filter((r) => r._id !== reservationId))
+        toast({
+          title: "Success",
+          description: "Reservation deleted successfully",
+        })
+      } else {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to delete reservation")
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete reservation",
+        variant: "destructive",
+      })
     }
   }
 
-  const handleCheckOut = async (reservation: any) => {
+  const handleCheckIn = async (reservationId: string) => {
     try {
-      await checkOut(reservation._id)
-      toast.success(`${reservation.guest.name} checked out successfully!`)
-    } catch (error: any) {
-      toast.error(error.message || "Failed to check out")
+      const response = await fetch(`/api/reservations/check-in/${reservationId}`, {
+        method: "POST",
+      })
+
+      if (response.ok) {
+        const updatedReservation = await response.json()
+        setReservations(reservations.map((r) => (r._id === reservationId ? updatedReservation : r)))
+        toast({
+          title: "Success",
+          description: "Guest checked in successfully",
+        })
+      } else {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to check in")
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to check in",
+        variant: "destructive",
+      })
     }
   }
 
-  const getStatusStats = () => {
-    const stats = {
-      total: reservations.length,
-      confirmed: reservations.filter((r) => r.status === "confirmed").length,
-      checkedIn: reservations.filter((r) => r.status === "checked-in").length,
-      checkedOut: reservations.filter((r) => r.status === "checked-out").length,
-      cancelled: reservations.filter((r) => r.status === "cancelled").length,
+  const handleCheckOut = async (reservationId: string) => {
+    try {
+      const response = await fetch(`/api/reservations/check-out/${reservationId}`, {
+        method: "POST",
+      })
+
+      if (response.ok) {
+        const updatedReservation = await response.json()
+        setReservations(reservations.map((r) => (r._id === reservationId ? updatedReservation : r)))
+        toast({
+          title: "Success",
+          description: "Guest checked out successfully",
+        })
+      } else {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to check out")
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to check out",
+        variant: "destructive",
+      })
     }
-    return stats
   }
 
-  const stats = getStatusStats()
-
-  const renderCell = (reservation: any, column: any) => {
+  const renderCell = (reservation: Reservation, column: any) => {
     switch (column.key) {
-      case "guest.name":
+      case "guest":
+        return (
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-[#468DD6] rounded-full flex items-center justify-center">
+              <span className="text-white text-sm font-medium">
+                {typeof reservation.guest === "object" ? reservation.guest.name.charAt(0) : "G"}
+              </span>
+            </div>
+            <div>
+              <div className="font-medium">
+                {typeof reservation.guest === "object" ? reservation.guest.name : "Unknown Guest"}
+              </div>
+              <div className="text-sm text-gray-500">
+                {typeof reservation.guest === "object" ? reservation.guest.email : ""}
+              </div>
+            </div>
+          </div>
+        )
+      case "room":
         return (
           <div>
-            <div className="font-medium">{reservation.guest.name}</div>
-            <div className="text-sm text-gray-500">{reservation.guest.email}</div>
+            <div className="font-medium">
+              Room {typeof reservation.room === "object" ? reservation.room.number : reservation.room}
+            </div>
+            <div className="text-sm text-gray-500">
+              {typeof reservation.room === "object" ? reservation.room.type : ""}
+            </div>
           </div>
         )
-      case "room.number":
+      case "dates":
         return (
           <div>
-            <div className="font-medium">Room {reservation.room.number}</div>
-            <div className="text-sm text-gray-500 capitalize">{reservation.room.type}</div>
+            <div className="font-medium">{formatDate(reservation.checkInDate)}</div>
+            <div className="text-sm text-gray-500">{formatDate(reservation.checkOutDate)}</div>
           </div>
         )
-      case "checkInDate":
+      case "guests":
         return (
-          <div>
-            <div className="font-medium">{format(new Date(reservation.checkInDate), "MMM dd, yyyy")}</div>
-            <div className="text-sm text-gray-500">{format(new Date(reservation.checkInDate), "h:mm a")}</div>
+          <div className="text-center">
+            <div className="font-medium">{reservation.adults + reservation.children}</div>
+            <div className="text-sm text-gray-500">
+              {reservation.adults}A {reservation.children}C
+            </div>
           </div>
         )
-      case "checkOutDate":
-        return (
-          <div>
-            <div className="font-medium">{format(new Date(reservation.checkOutDate), "MMM dd, yyyy")}</div>
-            <div className="text-sm text-gray-500">{format(new Date(reservation.checkOutDate), "h:mm a")}</div>
-          </div>
-        )
-      case "status":
-        return (
-          <div className="flex items-center gap-2">
-            <StatusBadge status={reservation.status} variant="reservation" />
-            {reservation.adults > 0 && (
-              <Badge variant="outline" className="text-xs">
-                {reservation.adults} Adults {reservation.children > 0 && `+ ${reservation.children} Children`}
-              </Badge>
-            )}
-          </div>
-        )
-      case "totalAmount":
+      case "total":
         return <span className="font-medium">{formatCurrency(reservation.totalAmount)}</span>
+      case "status":
+        return <StatusBadge status={reservation.status} />
       case "actions":
         return (
           <div className="flex space-x-1">
@@ -175,50 +292,54 @@ export default function ReservationsPage() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => handleCheckIn(reservation)}
-                className="text-green-600 hover:text-green-700"
+                onClick={() => handleCheckIn(reservation._id!.toString())}
+                title="Check In"
               >
-                <UserCheck className="h-4 w-4" />
+                <LogIn className="h-4 w-4" />
               </Button>
             )}
             {reservation.status === "checked-in" && (
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => handleCheckOut(reservation)}
-                className="text-blue-600 hover:text-blue-700"
+                onClick={() => handleCheckOut(reservation._id!.toString())}
+                title="Check Out"
               >
-                <UserX className="h-4 w-4" />
+                <LogOut className="h-4 w-4" />
               </Button>
             )}
-            <Button size="sm" variant="outline" onClick={() => setEditingReservation(reservation)}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setEditingReservation(reservation)
+                setIsFormOpen(true)
+              }}
+              title="Edit"
+            >
               <Edit className="h-4 w-4" />
             </Button>
             <Button
               size="sm"
               variant="outline"
-              onClick={() => setDeletingReservation(reservation)}
-              className="text-red-600 hover:text-red-700"
+              onClick={() => handleDeleteReservation(reservation._id!.toString())}
+              title="Delete"
             >
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
         )
       default:
-        return reservation[column.key]
+        return reservation[column.key as keyof Reservation]
     }
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[#468DD6]"></div>
       </div>
     )
-  }
-
-  if (error) {
-    return <div className="text-center text-red-600 dark:text-red-400">Error: {error}</div>
   }
 
   return (
@@ -230,9 +351,15 @@ export default function ReservationsPage() {
       >
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Reservations</h1>
-          <p className="text-gray-600 dark:text-gray-400">Manage all hotel reservations</p>
+          <p className="text-gray-600 dark:text-gray-400">Manage hotel reservations and bookings</p>
         </div>
-        <Button onClick={() => setIsFormOpen(true)} className="bg-[#1B2A41] hover:bg-[#1B2A41]/90">
+        <Button
+          className="bg-[#1B2A41] hover:bg-[#1B2A41]/90"
+          onClick={() => {
+            setEditingReservation(null)
+            setIsFormOpen(true)
+          }}
+        >
           <Plus className="h-4 w-4 mr-2" />
           New Reservation
         </Button>
@@ -247,32 +374,61 @@ export default function ReservationsPage() {
       >
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Total Reservations</div>
+            <div className="flex items-center space-x-2">
+              <Calendar className="h-5 w-5 text-[#468DD6]" />
+              <div>
+                <p className="text-sm text-gray-600">Total</p>
+                <p className="text-2xl font-bold">{stats.total}</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
+
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-yellow-600">{stats.confirmed}</div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Confirmed</div>
+            <div className="flex items-center space-x-2">
+              <Clock className="h-5 w-5 text-yellow-500" />
+              <div>
+                <p className="text-sm text-gray-600">Confirmed</p>
+                <p className="text-2xl font-bold">{stats.confirmed}</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
+
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-green-600">{stats.checkedIn}</div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Checked In</div>
+            <div className="flex items-center space-x-2">
+              <LogIn className="h-5 w-5 text-green-500" />
+              <div>
+                <p className="text-sm text-gray-600">Checked In</p>
+                <p className="text-2xl font-bold">{stats.checkedIn}</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
+
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-600">{stats.checkedOut}</div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Checked Out</div>
+            <div className="flex items-center space-x-2">
+              <LogOut className="h-5 w-5 text-blue-500" />
+              <div>
+                <p className="text-sm text-gray-600">Checked Out</p>
+                <p className="text-2xl font-bold">{stats.checkedOut}</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
+
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-red-600">{stats.cancelled}</div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Cancelled</div>
+            <div className="flex items-center space-x-2">
+              <Users className="h-5 w-5 text-red-500" />
+              <div>
+                <p className="text-sm text-gray-600">Cancelled</p>
+                <p className="text-2xl font-bold">{stats.cancelled}</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </motion.div>
@@ -280,72 +436,23 @@ export default function ReservationsPage() {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
         <Card>
           <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle>All Reservations</CardTitle>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="confirmed">Confirmed</SelectItem>
-                  <SelectItem value="checked-in">Checked In</SelectItem>
-                  <SelectItem value="checked-out">Checked Out</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <CardTitle>All Reservations ({reservations.length})</CardTitle>
           </CardHeader>
           <CardContent>
-            <DataTable data={filteredReservations} columns={columns} searchKey="guest.name" renderCell={renderCell} />
+            <DataTable data={reservations} columns={columns} searchKey="guest" renderCell={renderCell} />
           </CardContent>
         </Card>
       </motion.div>
 
-      {/* Create/Edit Reservation Dialog */}
-      <Dialog
-        open={isFormOpen || !!editingReservation}
-        onOpenChange={(open) => {
-          if (!open) {
-            setIsFormOpen(false)
-            setEditingReservation(null)
-          }
+      <ReservationForm
+        isOpen={isFormOpen}
+        onClose={() => {
+          setIsFormOpen(false)
+          setEditingReservation(null)
         }}
-      >
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{editingReservation ? "Edit Reservation" : "Create New Reservation"}</DialogTitle>
-          </DialogHeader>
-          <ReservationForm
-            reservation={editingReservation}
-            onSubmit={editingReservation ? handleUpdateReservation : handleCreateReservation}
-            onCancel={() => {
-              setIsFormOpen(false)
-              setEditingReservation(null)
-            }}
-            isSubmitting={isSubmitting}
-          />
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deletingReservation} onOpenChange={() => setDeletingReservation(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Reservation</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete the reservation for {deletingReservation?.guest?.name}? This action cannot
-              be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteReservation} className="bg-red-600 hover:bg-red-700">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onSubmit={editingReservation ? handleUpdateReservation : handleCreateReservation}
+        reservation={editingReservation}
+      />
     </div>
   )
 }

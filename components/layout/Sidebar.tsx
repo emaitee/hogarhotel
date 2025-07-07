@@ -89,8 +89,11 @@ const menuGroups: MenuGroup[] = [
 ]
 
 export default function Sidebar() {
-  const { isCollapsed } = useSidebarStore()
+  const { isOpen } = useSidebarStore()
   const pathname = usePathname()
+
+  const isCollapsed = !isOpen
+  
   const [expandedGroups, setExpandedGroups] = useState<string[]>(
     menuGroups.filter((group) => group.defaultOpen).map((group) => group.name),
   )

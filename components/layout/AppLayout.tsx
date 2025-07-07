@@ -6,6 +6,7 @@ import { useSidebarStore } from '@/store/sidebarStore';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import Sidebar from './Sidebar';
 import { Topbar } from './Topbar';
+import { usePathname } from 'next/navigation';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -14,6 +15,9 @@ interface AppLayoutProps {
 export function AppLayout({ children }: AppLayoutProps) {
   const { isDark } = useThemeStore();
   const { open } = useSidebarStore();
+
+  const pathname = usePathname();
+  const isLoginPage = pathname === '/login';
 
   useEffect(() => {
     if (isDark) {
@@ -38,6 +42,10 @@ export function AppLayout({ children }: AppLayoutProps) {
     return () => window.removeEventListener('resize', handleResize);
   }, [open]);
 
+  
+
+  if(isLoginPage) return children
+        
   return (
     <AuthGuard>
       <div className="flex h-screen bg-gray-50 dark:bg-gray-900">

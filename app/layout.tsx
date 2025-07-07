@@ -1,4 +1,4 @@
-"use client"
+
 
 import type React from "react"
 
@@ -14,12 +14,10 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const pathname = usePathname()
-  const isLoginPage = pathname === "/login"
 
   return (
     <html lang="en">
-      <body className={inter.className}>{isLoginPage ? children : <AppLayout>{children}</AppLayout>}</body>
+      <body className={inter.className}><AppLayout>{children}</AppLayout></body>
     </html>
   )
 }

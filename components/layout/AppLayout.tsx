@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useAuthStore } from "@/store/authStore"
 import { useSidebarStore } from "@/store/sidebarStore"
 import { Sidebar } from "./Sidebar"
@@ -19,6 +19,9 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { isCollapsed } = useSidebarStore()
   const router = useRouter()
 
+  const pathname = usePathname()
+    const isLoginPage = pathname === "/login"
+
   useEffect(() => {
     // Check authentication on mount
     const authenticated = checkAuth()
@@ -31,6 +34,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   if (!isAuthenticated) {
     return null
   }
+
+  if (isLoginPage) return children
 
   return (
     <div className="flex h-screen bg-gray-50">

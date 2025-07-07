@@ -1,15 +1,21 @@
-import { create } from 'zustand';
+import { create } from "zustand"
+import { persist } from "zustand/middleware"
 
 interface SidebarStore {
-  isOpen: boolean;
-  toggle: () => void;
-  close: () => void;
-  open: () => void;
+  isCollapsed: boolean
+  toggle: () => void
+  setCollapsed: (collapsed: boolean) => void
 }
 
-export const useSidebarStore = create<SidebarStore>((set) => ({
-  isOpen: true, // Default to open on desktop
-  toggle: () => set((state) => ({ isOpen: !state.isOpen })),
-  close: () => set({ isOpen: false }),
-  open: () => set({ isOpen: true })
-}));
+export const useSidebarStore = create<SidebarStore>()(
+  persist(
+    (set) => ({
+      isCollapsed: false,
+      toggle: () => set((state) => ({ isCollapsed: !state.isCollapsed })),
+      setCollapsed: (collapsed: boolean) => set({ isCollapsed: collapsed }),
+    }),
+    {
+      name: "sidebar-storage",
+    },
+  ),
+)

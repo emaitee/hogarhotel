@@ -1,43 +1,56 @@
-'use client';
+"use client"
 
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/store/authStore';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Hotel, Eye, EyeOff } from 'lucide-react';
+import type React from "react"
+
+import { useState } from "react"
+import { motion } from "framer-motion"
+import { useRouter } from "next/navigation"
+import { useAuthStore } from "@/store/authStore"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Hotel, Eye, EyeOff } from "lucide-react"
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  
-  const { login } = useAuthStore();
-  const router = useRouter();
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
+
+  const { login } = useAuthStore()
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
+    e.preventDefault()
+    setIsLoading(true)
+    setError("")
 
     try {
-      const success = await login(email, password);
+      const success = await login(email, password)
       if (success) {
-        router.push('/dashboard');
+        router.push("/dashboard")
       } else {
-        setError('Invalid credentials. Try admin@hotel.com / admin123');
+        setError("Invalid credentials. Please check your email and password.")
       }
     } catch (err) {
-      setError('Login failed. Please try again.');
+      setError("Login failed. Please try again.")
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
+
+  const demoCredentials = [
+    { role: "Admin", email: "admin@hotel.com", password: "admin123" },
+    { role: "Manager", email: "manager@hotel.com", password: "manager123" },
+    { role: "Receptionist", email: "receptionist@hotel.com", password: "receptionist123" },
+  ]
+
+  const fillCredentials = (email: string, password: string) => {
+    setEmail(email)
+    setPassword(password)
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F5F7FA] to-[#C3CFE2] flex items-center justify-center p-4">
@@ -54,12 +67,8 @@ export default function LoginPage() {
                 <Hotel className="h-8 w-8 text-white" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold text-[#1B2A41]">
-              Welcome to HotelPro
-            </CardTitle>
-            <CardDescription>
-              Sign in to your account to continue
-            </CardDescription>
+            <CardTitle className="text-2xl font-bold text-[#1B2A41]">Welcome to HotelPro</CardTitle>
+            <CardDescription>Sign in to your account to continue</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -80,7 +89,7 @@ export default function LoginPage() {
                 <div className="relative">
                   <Input
                     id="password"
-                    type={showPassword ? 'text' : 'password'}
+                    type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -102,24 +111,33 @@ export default function LoginPage() {
                   </Button>
                 </div>
               </div>
-              {error && (
-                <div className="text-red-500 text-sm">{error}</div>
-              )}
-              <Button
-                type="submit"
-                className="w-full bg-[#1B2A41] hover:bg-[#1B2A41]/90"
-                disabled={isLoading}
-              >
-                {isLoading ? 'Signing in...' : 'Sign In'}
+              {error && <div className="text-red-500 text-sm">{error}</div>}
+              <Button type="submit" className="w-full bg-[#1B2A41] hover:bg-[#1B2A41]/90" disabled={isLoading}>
+                {isLoading ? "Signing in..." : "Sign In"}
               </Button>
             </form>
-            <div className="mt-6 text-center text-sm text-gray-500">
-              <p>Demo credentials:</p>
-              <p className="font-mono">admin@hotel.com / admin123</p>
+
+            <div className="mt-6 space-y-3">
+              <div className="text-center text-sm text-gray-500">
+                <p className="font-medium">Demo Credentials:</p>
+              </div>
+              <div className="space-y-2">
+                {demoCredentials.map((cred, index) => (
+                  <Button
+                    key={index}
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-xs bg-transparent"
+                    onClick={() => fillCredentials(cred.email, cred.password)}
+                  >
+                    {cred.role}: {cred.email}
+                  </Button>
+                ))}
+              </div>
             </div>
           </CardContent>
         </Card>
       </motion.div>
     </div>
-  );
+  )
 }

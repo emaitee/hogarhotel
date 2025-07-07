@@ -1,220 +1,208 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { motion, AnimatePresence } from "framer-motion"
+import { cn } from "@/lib/utils"
 import { useSidebarStore } from "@/store/sidebarStore"
+import { Button } from "@/components/ui/button"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
   LayoutDashboard,
-  Calendar,
-  Bed,
-  UserCheck,
-  UserX,
   Users,
-  UserPlus,
-  BrushIcon as Broom,
+  Bed,
+  Calendar,
+  UserCheck,
+  LogOut,
   CreditCard,
-  Calculator,
-  UserCog,
-  UsersRound,
-  BarChart3,
+  FileText,
   Settings,
+  BarChart3,
+  Building,
+  ClipboardList,
+  DollarSign,
+  UserPlus,
   ChevronDown,
   ChevronRight,
+  Hotel,
+  Menu,
+  X,
 } from "lucide-react"
-import { cn } from "@/lib/utils"
 
 interface MenuItem {
-  name: string
+  title: string
   href: string
-  icon: any
+  icon: React.ComponentType<{ className?: string }>
 }
 
 interface MenuGroup {
-  name: string
+  title: string
   items: MenuItem[]
   defaultOpen?: boolean
 }
 
 const menuGroups: MenuGroup[] = [
   {
-    name: "Overview",
+    title: "Overview",
     defaultOpen: true,
-    items: [{ name: "Dashboard", href: "/dashboard", icon: LayoutDashboard }],
+    items: [{ title: "Dashboard", href: "/dashboard", icon: LayoutDashboard }],
   },
   {
-    name: "Front Office",
+    title: "Front Office",
     defaultOpen: true,
     items: [
-      { name: "Reservations", href: "/reservations", icon: Calendar },
-      { name: "Rooms", href: "/rooms", icon: Bed },
-      { name: "Check In", href: "/check-in", icon: UserCheck },
-      { name: "Check Out", href: "/check-out", icon: UserX },
+      { title: "Rooms", href: "/rooms", icon: Bed },
+      { title: "Reservations", href: "/reservations", icon: Calendar },
+      { title: "Check-in", href: "/check-in", icon: UserCheck },
+      { title: "Check-out", href: "/check-out", icon: LogOut },
     ],
   },
   {
-    name: "Guest Management",
+    title: "Guest Management",
+    defaultOpen: false,
     items: [
-      { name: "Customers", href: "/customers", icon: Users },
-      { name: "Guest Registry", href: "/guests", icon: UserPlus },
+      { title: "Guests", href: "/guests", icon: Users },
+      { title: "Customer Service", href: "/customers", icon: UserPlus },
     ],
   },
   {
-    name: "Operations",
-    items: [{ name: "Housekeeping", href: "/housekeeping", icon: Broom }],
+    title: "Operations",
+    defaultOpen: false,
+    items: [{ title: "Housekeeping", href: "/housekeeping", icon: ClipboardList }],
   },
   {
-    name: "Financial",
+    title: "Financial",
+    defaultOpen: false,
     items: [
-      { name: "Billing", href: "/billing", icon: CreditCard },
-      { name: "Accounting", href: "/accounting", icon: Calculator },
+      { title: "Billing", href: "/billing", icon: CreditCard },
+      { title: "Accounting", href: "/accounting", icon: DollarSign },
     ],
   },
   {
-    name: "Human Resources",
+    title: "Human Resources",
+    defaultOpen: false,
     items: [
-      { name: "HR Management", href: "/hr", icon: UserCog },
-      { name: "Staff Directory", href: "/staff", icon: UsersRound },
+      { title: "Staff", href: "/staff", icon: Users },
+      { title: "HR Management", href: "/hr", icon: Building },
     ],
   },
   {
-    name: "Analytics",
-    items: [{ name: "Reports", href: "/reports", icon: BarChart3 }],
+    title: "Analytics",
+    defaultOpen: false,
+    items: [
+      { title: "Reports", href: "/reports", icon: FileText },
+      { title: "Analytics", href: "/analytics", icon: BarChart3 },
+    ],
   },
   {
-    name: "System",
-    items: [{ name: "Settings", href: "/settings", icon: Settings }],
+    title: "System",
+    defaultOpen: false,
+    items: [{ title: "Settings", href: "/settings", icon: Settings }],
   },
 ]
 
-export default function Sidebar() {
-  const { isOpen } = useSidebarStore()
+export function Sidebar() {
   const pathname = usePathname()
-
-  const isCollapsed = !isOpen
-  
-  const [expandedGroups, setExpandedGroups] = useState<string[]>(
-    menuGroups.filter((group) => group.defaultOpen).map((group) => group.name),
+  const { isCollapsed, toggle } = useSidebarStore()
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(
+    menuGroups.reduce(
+      (acc, group) => ({
+        ...acc,
+        [group.title]: group.defaultOpen || false,
+      }),
+      {},
+    ),
   )
 
-  const toggleGroup = (groupName: string) => {
-    setExpandedGroups((prev) =>
-      prev.includes(groupName) ? prev.filter((name) => name !== groupName) : [...prev, groupName],
-    )
-  }
-
-  if (isCollapsed) {
-    return (
-      <motion.div
-        initial={{ width: 280 }}
-        animate={{ width: 80 }}
-        className="bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 h-full flex flex-col"
-      >
-        <div className="p-4 border-b border-gray-200 dark:border-gray-800">
-          <div className="w-8 h-8 bg-[#1B2A41] rounded-lg flex items-center justify-center">
-            <Bed className="h-5 w-5 text-white" />
-          </div>
-        </div>
-        <nav className="flex-1 p-2 space-y-1">
-          {menuGroups
-            .flatMap((group) => group.items)
-            .map((item) => {
-              const Icon = item.icon
-              const isActive = pathname === item.href
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center justify-center p-3 rounded-lg transition-colors group relative",
-                    isActive
-                      ? "bg-[#1B2A41] text-white"
-                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800",
-                  )}
-                  title={item.name}
-                >
-                  <Icon className="h-5 w-5" />
-                  <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                    {item.name}
-                  </div>
-                </Link>
-              )
-            })}
-        </nav>
-      </motion.div>
-    )
+  const toggleGroup = (groupTitle: string) => {
+    setOpenGroups((prev) => ({
+      ...prev,
+      [groupTitle]: !prev[groupTitle],
+    }))
   }
 
   return (
-    <motion.div
-      initial={{ width: 80 }}
-      animate={{ width: 280 }}
-      className="bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 h-full flex flex-col"
+    <div
+      className={cn(
+        "fixed left-0 top-0 z-40 h-screen bg-white border-r border-gray-200 transition-all duration-300",
+        isCollapsed ? "w-16" : "w-64",
+      )}
     >
-      <div className="p-6 border-b border-gray-200 dark:border-gray-800">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-[#1B2A41] rounded-lg flex items-center justify-center">
-            <Bed className="h-5 w-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">HotelPro</h1>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Management System</p>
-          </div>
+      <div className="flex h-full flex-col">
+        {/* Header */}
+        <div className="flex h-16 items-center justify-between px-4 border-b border-gray-200">
+          {!isCollapsed && (
+            <div className="flex items-center space-x-2">
+              <Hotel className="h-8 w-8 text-[#1B2A41]" />
+              <span className="text-xl font-bold text-[#1B2A41]">HotelPro</span>
+            </div>
+          )}
+          <Button variant="ghost" size="sm" onClick={toggle} className="h-8 w-8 p-0">
+            {isCollapsed ? <Menu className="h-4 w-4" /> : <X className="h-4 w-4" />}
+          </Button>
         </div>
-      </div>
 
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-        {menuGroups.map((group) => {
-          const isExpanded = expandedGroups.includes(group.name)
-
-          return (
-            <div key={group.name} className="space-y-1">
-              <button
-                onClick={() => toggleGroup(group.name)}
-                className="w-full flex items-center justify-between p-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+        {/* Navigation */}
+        <ScrollArea className="flex-1 px-3 py-4">
+          <div className="space-y-2">
+            {menuGroups.map((group) => (
+              <Collapsible
+                key={group.title}
+                open={openGroups[group.title]}
+                onOpenChange={() => toggleGroup(group.title)}
               >
-                <span>{group.name}</span>
-                {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-              </button>
-
-              <AnimatePresence>
-                {isExpanded && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="space-y-1 overflow-hidden"
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className={cn(
+                      "w-full justify-start font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100",
+                      isCollapsed && "justify-center px-2",
+                    )}
                   >
-                    {group.items.map((item) => {
-                      const Icon = item.icon
-                      const isActive = pathname === item.href
-
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
+                    {!isCollapsed && (
+                      <>
+                        <span className="flex-1 text-left">{group.title}</span>
+                        {openGroups[group.title] ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </>
+                    )}
+                    {isCollapsed && <div className="h-2 w-2 rounded-full bg-gray-400" />}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-1">
+                  {group.items.map((item) => {
+                    const isActive = pathname === item.href
+                    return (
+                      <Link key={item.href} href={item.href}>
+                        <Button
+                          variant="ghost"
                           className={cn(
-                            "flex items-center space-x-3 p-3 rounded-lg transition-colors",
-                            isActive
-                              ? "bg-[#1B2A41] text-white"
-                              : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800",
+                            "w-full justify-start text-gray-600 hover:text-gray-900 hover:bg-gray-100",
+                            isActive && "bg-[#1B2A41] text-white hover:bg-[#1B2A41]/90 hover:text-white",
+                            isCollapsed ? "justify-center px-2" : "pl-6",
                           )}
                         >
-                          <Icon className="h-4 w-4" />
-                          <span className="text-sm font-medium">{item.name}</span>
-                        </Link>
-                      )
-                    })}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          )
-        })}
-      </nav>
-    </motion.div>
+                          <item.icon className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
+                          {!isCollapsed && item.title}
+                        </Button>
+                      </Link>
+                    )
+                  })}
+                </CollapsibleContent>
+              </Collapsible>
+            ))}
+          </div>
+        </ScrollArea>
+      </div>
+    </div>
   )
 }
+
+// Named export for compatibility
+export { Sidebar as default }

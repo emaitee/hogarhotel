@@ -1,21 +1,20 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { toast } from "@/hooks/use-toast"
 
 interface TaxRecord {
   _id: string
   taxType: string
-  period: {
-    startDate: string
-    endDate: string
-  }
-  taxableAmount: number
-  taxRate: number
-  taxAmount: number
-  status: "pending" | "filed" | "paid" | "overdue"
+  period: string
+  startDate: string
+  endDate: string
   dueDate: string
+  amount: number
+  status: "pending" | "filed" | "paid" | "overdue"
   filedDate?: string
   paidDate?: string
+  description?: string
   reference?: string
   notes?: string
   createdAt: string
@@ -23,10 +22,14 @@ interface TaxRecord {
 }
 
 interface TaxStats {
-  total: { totalTax: number; totalTaxable: number; count: number }
-  byStatus: Array<{ _id: string; total: number; count: number }>
-  byType: Array<{ _id: string; total: number; count: number }>
-  upcomingDue: TaxRecord[]
+  totalLiability: number
+  totalPending: number
+  totalOverdue: number
+  totalPaid: number
+  pendingCount: number
+  overdueCount: number
+  filedCount: number
+  paidCount: number
 }
 
 interface UseTaxRecordsReturn {
@@ -40,17 +43,17 @@ interface UseTaxRecordsReturn {
     total: number
     pages: number
   }
-  createTaxRecord: (taxData: any) => Promise<TaxRecord>
-  updateTaxRecord: (id: string, updates: any) => Promise<TaxRecord>
-  deleteTaxRecord: (id: string) => Promise<void>
-  fetchTaxRecords: (filters?: any) => Promise<void>
-  fetchStats: (filters?: any) => Promise<void>
+  createTaxRecord: (data: Partial<TaxRecord>) => Promise<boolean>
+  updateTaxRecord: (id: string, data: Partial<TaxRecord>) => Promise<boolean>
+  deleteTaxRecord: (id: string) => Promise<boolean>
+  fetchTaxRecords: (filters?: { status?: string; taxType?: string; page?: number }) => Promise<void>
+  refreshStats: () => Promise<void>
 }
 
 export function useTaxRecords(): UseTaxRecordsReturn {
   const [taxRecords, setTaxRecords] = useState<TaxRecord[]>([])
   const [stats, setStats] = useState<TaxStats | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [pagination, setPagination] = useState({
     page: 1,
@@ -59,120 +62,158 @@ export function useTaxRecords(): UseTaxRecordsReturn {
     pages: 0,
   })
 
-  const fetchTaxRecords = async (filters: any = {}) => {
+  const fetchTaxRecords = async (filters: { status?: string; taxType?: string; page?: number } = {}) => {
     try {
       setLoading(true)
       setError(null)
 
       const params = new URLSearchParams()
-      Object.keys(filters).forEach((key) => {
-        if (filters[key]) params.append(key, filters[key])
-      })
+      if (filters.status) params.append("status", filters.status)
+      if (filters.taxType) params.append("taxType", filters.taxType)
+      params.append("page", (filters.page || pagination.page).toString())
+      params.append("limit", pagination.limit.toString())
 
       const response = await fetch(`/api/tax-records?${params}`)
-      if (!response.ok) throw new Error("Failed to fetch tax records")
+      const result = await response.json()
 
-      const data = await response.json()
-      setTaxRecords(data.taxRecords)
-      setPagination(data.pagination)
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to fetch tax records")
+      }
+
+      setTaxRecords(result.data)
+      setPagination(result.pagination)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred")
+      const errorMessage = err instanceof Error ? err.message : "An error occurred"
+      setError(errorMessage)
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
   }
 
-  const fetchStats = async (filters: any = {}) => {
+  const refreshStats = async () => {
     try {
-      const params = new URLSearchParams()
-      Object.keys(filters).forEach((key) => {
-        if (filters[key]) params.append(key, filters[key])
-      })
+      const response = await fetch("/api/tax-records/stats")
+      const result = await response.json()
 
-      const response = await fetch(`/api/tax-records/stats?${params}`)
-      if (!response.ok) throw new Error("Failed to fetch tax statistics")
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to fetch tax statistics")
+      }
 
-      const data = await response.json()
-      setStats(data)
+      setStats(result.data)
     } catch (err) {
       console.error("Error fetching tax stats:", err)
     }
   }
 
-  const createTaxRecord = async (taxData: any): Promise<TaxRecord> => {
+  const createTaxRecord = async (data: Partial<TaxRecord>): Promise<boolean> => {
     try {
-      setError(null)
-
       const response = await fetch("/api/tax-records", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(taxData),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
       })
 
+      const result = await response.json()
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to create tax record")
+        throw new Error(result.error || "Failed to create tax record")
       }
 
-      const newTaxRecord = await response.json()
-      setTaxRecords((prev) => [newTaxRecord, ...prev])
-      return newTaxRecord
+      toast({
+        title: "Success",
+        description: "Tax record created successfully",
+      })
+
+      await fetchTaxRecords()
+      await refreshStats()
+      return true
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An error occurred"
-      setError(errorMessage)
-      throw new Error(errorMessage)
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      })
+      return false
     }
   }
 
-  const updateTaxRecord = async (id: string, updates: any): Promise<TaxRecord> => {
+  const updateTaxRecord = async (id: string, data: Partial<TaxRecord>): Promise<boolean> => {
     try {
-      setError(null)
-
       const response = await fetch(`/api/tax-records/${id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updates),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
       })
 
+      const result = await response.json()
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to update tax record")
+        throw new Error(result.error || "Failed to update tax record")
       }
 
-      const updatedTaxRecord = await response.json()
-      setTaxRecords((prev) => prev.map((record) => (record._id === id ? updatedTaxRecord : record)))
-      return updatedTaxRecord
+      toast({
+        title: "Success",
+        description: "Tax record updated successfully",
+      })
+
+      await fetchTaxRecords()
+      await refreshStats()
+      return true
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An error occurred"
-      setError(errorMessage)
-      throw new Error(errorMessage)
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      })
+      return false
     }
   }
 
-  const deleteTaxRecord = async (id: string): Promise<void> => {
+  const deleteTaxRecord = async (id: string): Promise<boolean> => {
     try {
-      setError(null)
-
       const response = await fetch(`/api/tax-records/${id}`, {
         method: "DELETE",
       })
 
+      const result = await response.json()
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to delete tax record")
+        throw new Error(result.error || "Failed to delete tax record")
       }
 
-      setTaxRecords((prev) => prev.filter((record) => record._id !== id))
+      toast({
+        title: "Success",
+        description: "Tax record deleted successfully",
+      })
+
+      await fetchTaxRecords()
+      await refreshStats()
+      return true
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An error occurred"
-      setError(errorMessage)
-      throw new Error(errorMessage)
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      })
+      return false
     }
   }
 
   useEffect(() => {
     fetchTaxRecords()
-    fetchStats()
+    refreshStats()
   }, [])
 
   return {
@@ -185,6 +226,6 @@ export function useTaxRecords(): UseTaxRecordsReturn {
     updateTaxRecord,
     deleteTaxRecord,
     fetchTaxRecords,
-    fetchStats,
+    refreshStats,
   }
 }

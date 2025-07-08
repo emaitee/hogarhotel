@@ -1,46 +1,56 @@
-import mongoose from "mongoose"
+import mongoose, { type Document, Schema } from "mongoose"
 
-const taxRecordSchema = new mongoose.Schema(
+export interface ITaxRecord extends Document {
+  taxType: string
+  period: string
+  startDate: Date
+  endDate: Date
+  dueDate: Date
+  amount: number
+  status: "pending" | "filed" | "paid" | "overdue"
+  filedDate?: Date
+  paidDate?: Date
+  description?: string
+  reference?: string
+  notes?: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+const TaxRecordSchema = new Schema<ITaxRecord>(
   {
     taxType: {
       type: String,
       required: true,
-      enum: ["income_tax", "sales_tax", "property_tax", "payroll_tax", "other"],
+      trim: true,
     },
     period: {
-      startDate: {
-        type: Date,
-        required: true,
-      },
-      endDate: {
-        type: Date,
-        required: true,
-      },
-    },
-    taxableAmount: {
-      type: Number,
+      type: String,
       required: true,
-      min: 0,
+      trim: true,
     },
-    taxRate: {
-      type: Number,
+    startDate: {
+      type: Date,
       required: true,
-      min: 0,
-      max: 100,
     },
-    taxAmount: {
+    endDate: {
+      type: Date,
+      required: true,
+    },
+    dueDate: {
+      type: Date,
+      required: true,
+    },
+    amount: {
       type: Number,
       required: true,
       min: 0,
     },
     status: {
       type: String,
+      required: true,
       enum: ["pending", "filed", "paid", "overdue"],
       default: "pending",
-    },
-    dueDate: {
-      type: Date,
-      required: true,
     },
     filedDate: {
       type: Date,
@@ -48,11 +58,11 @@ const taxRecordSchema = new mongoose.Schema(
     paidDate: {
       type: Date,
     },
-    reference: {
+    description: {
       type: String,
       trim: true,
     },
-    description: {
+    reference: {
       type: String,
       trim: true,
     },
@@ -60,26 +70,21 @@ const taxRecordSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    filedBy: {
-      type: String,
-      trim: true,
-    },
-    attachments: [
-      {
-        name: String,
-        url: String,
-        uploadedAt: { type: Date, default: Date.now },
-      },
-    ],
   },
   {
     timestamps: true,
   },
 )
 
-taxRecordSchema.index({ taxType: 1 })
-taxRecordSchema.index({ status: 1 })
-taxRecordSchema.index({ dueDate: 1 })
-taxRecordSchema.index({ "period.startDate": 1, "period.endDate": 1 })
+TaxRecordSchema.index({ taxType: 1, period: 1 })
+TaxRecordSchema.index({ status: 1, dueDate: 1 })
+TaxRecordSchema.index({ dueDate: 1 })
 
-export default mongoose.models.TaxRecord || mongoose.model("TaxRecord", taxRecordSchema)
+// Virtual to check if overdue
+TaxRecordSchema.virtual("isOverdue").get(function () {
+  return this.status !== "paid" && new Date() > this.dueDate
+})
+
+const TaxRecord = mongoose.models.TaxRecord || mongoose.model<ITaxRecord>("TaxRecord", TaxRecordSchema)
+
+export default TaxRecord

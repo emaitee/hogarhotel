@@ -1,100 +1,77 @@
 const { MongoClient } = require("mongodb")
 
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/hotel-management"
+const uri = process.env.MONGODB_URI || "mongodb://localhost:27017"
+const dbName = "hotel_management"
 
 const categories = [
   // Income Categories
   {
     name: "Room Revenue",
-    type: "income",
-    description: "Revenue from room bookings",
-    color: "#10B981",
     code: "ROOM_REV",
+    type: "income",
+    color: "#10B981",
+    description: "Revenue from room bookings",
   },
   {
     name: "Food & Beverage",
-    type: "income",
-    description: "Restaurant and bar revenue",
-    color: "#3B82F6",
     code: "F&B_REV",
+    type: "income",
+    color: "#3B82F6",
+    description: "Restaurant and bar revenue",
   },
   {
     name: "Event Services",
-    type: "income",
-    description: "Conference and event revenue",
-    color: "#8B5CF6",
     code: "EVENT_REV",
+    type: "income",
+    color: "#8B5CF6",
+    description: "Conference and event revenue",
   },
-  { name: "Spa Services", type: "income", description: "Spa and wellness revenue", color: "#EC4899", code: "SPA_REV" },
-  { name: "Other Revenue", type: "income", description: "Miscellaneous revenue", color: "#F59E0B", code: "OTHER_REV" },
+  { name: "Spa Services", code: "SPA_REV", type: "income", color: "#EC4899", description: "Spa and wellness revenue" },
+  { name: "Other Revenue", code: "OTHER_REV", type: "income", color: "#06B6D4", description: "Miscellaneous revenue" },
 
   // Expense Categories
   {
     name: "Utilities",
-    type: "expense",
-    description: "Electricity, water, gas, internet",
-    color: "#EF4444",
     code: "UTILITIES",
+    type: "expense",
+    color: "#F59E0B",
+    description: "Electricity, water, gas, internet",
   },
   {
     name: "Maintenance",
-    type: "expense",
-    description: "Property and equipment maintenance",
-    color: "#F97316",
     code: "MAINTENANCE",
-  },
-  {
-    name: "Staff Salaries",
     type: "expense",
-    description: "Employee wages and benefits",
-    color: "#84CC16",
-    code: "SALARIES",
-  },
-  {
-    name: "Marketing",
-    type: "expense",
-    description: "Advertising and promotional expenses",
-    color: "#06B6D4",
-    code: "MARKETING",
+    color: "#EF4444",
+    description: "Repairs and maintenance",
   },
   {
     name: "Supplies",
-    type: "expense",
-    description: "Office and operational supplies",
-    color: "#8B5CF6",
     code: "SUPPLIES",
-  },
-  {
-    name: "Insurance",
     type: "expense",
-    description: "Property and liability insurance",
-    color: "#EC4899",
-    code: "INSURANCE",
+    color: "#84CC16",
+    description: "Office and operational supplies",
   },
+  { name: "Marketing", code: "MARKETING", type: "expense", color: "#F97316", description: "Advertising and promotion" },
+  { name: "Insurance", code: "INSURANCE", type: "expense", color: "#6366F1", description: "Insurance premiums" },
   {
     name: "Professional Services",
+    code: "PROF_SERV",
     type: "expense",
+    color: "#14B8A6",
     description: "Legal, accounting, consulting",
-    color: "#6B7280",
-    code: "PROF_SERVICES",
   },
-  {
-    name: "Travel & Entertainment",
-    type: "expense",
-    description: "Business travel and client entertainment",
-    color: "#F59E0B",
-    code: "TRAVEL_ENT",
-  },
+  { name: "Travel", code: "TRAVEL", type: "expense", color: "#F43F5E", description: "Business travel expenses" },
+  { name: "Miscellaneous", code: "MISC_EXP", type: "expense", color: "#64748B", description: "Other expenses" },
 ]
 
 async function seedTransactionCategories() {
-  const client = new MongoClient(MONGODB_URI)
+  const client = new MongoClient(uri)
 
   try {
     await client.connect()
     console.log("Connected to MongoDB")
 
-    const db = client.db()
+    const db = client.db(dbName)
     const collection = db.collection("transactioncategories")
 
     // Clear existing categories
@@ -102,12 +79,20 @@ async function seedTransactionCategories() {
     console.log("Cleared existing transaction categories")
 
     // Insert new categories
-    const result = await collection.insertMany(categories)
+    const result = await collection.insertMany(
+      categories.map((category) => ({
+        ...category,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })),
+    )
+
     console.log(`Inserted ${result.insertedCount} transaction categories`)
 
     // Display inserted categories
     categories.forEach((category, index) => {
-      console.log(`${index + 1}. ${category.name} (${category.type}) - ${category.color}`)
+      console.log(`${index + 1}. ${category.name} (${category.code}) - ${category.type}`)
     })
   } catch (error) {
     console.error("Error seeding transaction categories:", error)

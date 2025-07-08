@@ -1,4 +1,5 @@
 import { MongoClient, type Db } from "mongodb"
+import mongoose from "mongoose"
 
 if (!process.env.MONGODB_URI) {
   throw new Error('Invalid/Missing environment variable: "MONGODB_URI"')
@@ -32,6 +33,24 @@ export async function connectToDatabase(): Promise<{ client: MongoClient; db: Db
   const client = await clientPromise
   const db = client.db("hotel_management")
   return { client, db }
+}
+
+// Mongoose connection
+let isConnected = false
+
+export async function connectDB() {
+  if (isConnected) {
+    return
+  }
+
+  try {
+    await mongoose.connect(uri)
+    isConnected = true
+    console.log("MongoDB connected successfully")
+  } catch (error) {
+    console.error("MongoDB connection error:", error)
+    throw error
+  }
 }
 
 export default clientPromise

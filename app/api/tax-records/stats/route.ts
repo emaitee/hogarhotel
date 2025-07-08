@@ -1,82 +1,85 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { connectDB } from "@/lib/mongodb"
 import TaxRecord from "@/lib/models/TaxRecord"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     await connectDB()
 
-    const { searchParams } = new URL(request.url)
-    const year = searchParams.get("year")
-
-    // Build date filter
-    const dateFilter: any = {}
-    if (year) {
-      const startDate = new Date(`${year}-01-01`)
-      const endDate = new Date(`${year}-12-31`)
-      dateFilter.dueDate = { $gte: startDate, $lte: endDate }
-    }
-
-    const [totalStats, statusStats, typeStats, upcomingDue] = await Promise.all([
-      // Total tax amounts
-      TaxRecord.aggregate([
-        { $match: dateFilter },
-        {
-          $group: {
-            _id: null,
-            totalTax: { $sum: "$taxAmount" },
-            totalTaxable: { $sum: "$taxableAmount" },
-            count: { $sum: 1 },
-          },
-        },
-      ]),
-
-      // By status
-      TaxRecord.aggregate([
-        { $match: dateFilter },
-        {
-          $group: {
-            _id: "$status",
-            total: { $sum: "$taxAmount" },
-            count: { $sum: 1 },
-          },
-        },
-      ]),
-
-      // By tax type
-      TaxRecord.aggregate([
-        { $match: dateFilter },
-        {
-          $group: {
-            _id: "$taxType",
-            total: { $sum: "$taxAmount" },
-            count: { $sum: 1 },
-          },
-        },
-        { $sort: { total: -1 } },
-      ]),
-
-      // Upcoming due dates (next 30 days)
-      TaxRecord.find({
+    // Update overdue records first
+    await TaxRecord.updateMany(
+      {
         status: { $in: ["pending", "filed"] },
-        dueDate: {
-          $gte: new Date(),
-          $lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        dueDate: { $lt: new Date() },
+      },
+      { status: "overdue" },
+    )
+
+    const [stats] = await TaxRecord.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalLiability: {
+            $sum: {
+              $cond: [{ $ne: ["$status", "paid"] }, "$amount", 0],
+            },
+          },
+          totalPending: {
+            $sum: {
+              $cond: [{ $eq: ["$status", "pending"] }, "$amount", 0],
+            },
+          },
+          totalOverdue: {
+            $sum: {
+              $cond: [{ $eq: ["$status", "overdue"] }, "$amount", 0],
+            },
+          },
+          totalPaid: {
+            $sum: {
+              $cond: [{ $eq: ["$status", "paid"] }, "$amount", 0],
+            },
+          },
+          pendingCount: {
+            $sum: {
+              $cond: [{ $eq: ["$status", "pending"] }, 1, 0],
+            },
+          },
+          overdueCount: {
+            $sum: {
+              $cond: [{ $eq: ["$status", "overdue"] }, 1, 0],
+            },
+          },
+          filedCount: {
+            $sum: {
+              $cond: [{ $eq: ["$status", "filed"] }, 1, 0],
+            },
+          },
+          paidCount: {
+            $sum: {
+              $cond: [{ $eq: ["$status", "paid"] }, 1, 0],
+            },
+          },
         },
-      })
-        .sort({ dueDate: 1 })
-        .limit(10)
-        .lean(),
+      },
     ])
 
+    const defaultStats = {
+      totalLiability: 0,
+      totalPending: 0,
+      totalOverdue: 0,
+      totalPaid: 0,
+      pendingCount: 0,
+      overdueCount: 0,
+      filedCount: 0,
+      paidCount: 0,
+    }
+
     return NextResponse.json({
-      total: totalStats[0] || { totalTax: 0, totalTaxable: 0, count: 0 },
-      byStatus: statusStats,
-      byType: typeStats,
-      upcomingDue,
+      success: true,
+      data: stats || defaultStats,
     })
   } catch (error) {
     console.error("Error fetching tax stats:", error)
-    return NextResponse.json({ error: "Failed to fetch tax statistics" }, { status: 500 })
+    return NextResponse.json({ success: false, error: "Failed to fetch tax statistics" }, { status: 500 })
   }
 }

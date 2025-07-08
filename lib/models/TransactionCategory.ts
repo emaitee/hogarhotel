@@ -1,16 +1,35 @@
-import mongoose from "mongoose"
+import mongoose, { type Document, Schema } from "mongoose"
 
-const transactionCategorySchema = new mongoose.Schema(
+export interface ITransactionCategory extends Document {
+  name: string
+  code: string
+  type: "income" | "expense"
+  description?: string
+  color: string
+  isActive: boolean
+  parentCategory?: mongoose.Types.ObjectId
+  createdAt: Date
+  updatedAt: Date
+}
+
+const TransactionCategorySchema = new Schema<ITransactionCategory>(
   {
     name: {
       type: String,
       required: true,
       trim: true,
     },
+    code: {
+      type: String,
+      required: true,
+      unique: true,
+      uppercase: true,
+      trim: true,
+    },
     type: {
       type: String,
-      enum: ["income", "expense"],
       required: true,
+      enum: ["income", "expense"],
     },
     description: {
       type: String,
@@ -18,6 +37,7 @@ const transactionCategorySchema = new mongoose.Schema(
     },
     color: {
       type: String,
+      required: true,
       default: "#3B82F6",
     },
     isActive: {
@@ -25,13 +45,8 @@ const transactionCategorySchema = new mongoose.Schema(
       default: true,
     },
     parentCategory: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "TransactionCategory",
-    },
-    code: {
-      type: String,
-      trim: true,
-      unique: true,
     },
   },
   {
@@ -39,8 +54,11 @@ const transactionCategorySchema = new mongoose.Schema(
   },
 )
 
-transactionCategorySchema.index({ name: 1 })
-transactionCategorySchema.index({ type: 1 })
-transactionCategorySchema.index({ isActive: 1 })
+TransactionCategorySchema.index({ code: 1 })
+TransactionCategorySchema.index({ type: 1, isActive: 1 })
 
-export default mongoose.models.TransactionCategory || mongoose.model("TransactionCategory", transactionCategorySchema)
+const TransactionCategory =
+  mongoose.models.TransactionCategory ||
+  mongoose.model<ITransactionCategory>("TransactionCategory", TransactionCategorySchema)
+
+export default TransactionCategory

@@ -1,10 +1,99 @@
-const { MongoClient } = require("mongodb")
+const { MongoClient, ObjectId } = require("mongodb")
 
-const MONGODB_URI = process.env.MONGODB_URI
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/hotel-management"
 
-if (!MONGODB_URI) {
-  throw new Error("Please define the MONGODB_URI environment variable")
-}
+const STAFF_MEMBERS = ["Maria Santos", "John Smith", "Ana Rodriguez", "David Johnson", "Lisa Chen", "Carlos Martinez"]
+
+const SAMPLE_TASKS = [
+  {
+    taskType: "cleaning",
+    status: "pending",
+    assignedTo: null,
+    priority: "medium",
+    notes: "Standard room cleaning after checkout",
+    estimatedDuration: 45,
+    actualDuration: null,
+    startedAt: null,
+    completedAt: null,
+  },
+  {
+    taskType: "maintenance",
+    status: "pending",
+    assignedTo: null,
+    priority: "high",
+    notes: "Air conditioning unit making noise - needs inspection",
+    estimatedDuration: 60,
+    actualDuration: null,
+    startedAt: null,
+    completedAt: null,
+  },
+  {
+    taskType: "cleaning",
+    status: "in-progress",
+    assignedTo: "Maria Santos",
+    priority: "medium",
+    notes: "Deep cleaning required - guest reported stains",
+    estimatedDuration: 60,
+    actualDuration: null,
+    startedAt: new Date(Date.now() - 30 * 60 * 1000), // Started 30 minutes ago
+    completedAt: null,
+  },
+  {
+    taskType: "inspection",
+    status: "in-progress",
+    assignedTo: "John Smith",
+    priority: "low",
+    notes: "Monthly room inspection",
+    estimatedDuration: 30,
+    actualDuration: null,
+    startedAt: new Date(Date.now() - 15 * 60 * 1000), // Started 15 minutes ago
+    completedAt: null,
+  },
+  {
+    taskType: "maintenance",
+    status: "in-progress",
+    assignedTo: "David Johnson",
+    priority: "high",
+    notes: "Bathroom faucet leaking - urgent repair needed",
+    estimatedDuration: 90,
+    actualDuration: null,
+    startedAt: new Date(Date.now() - 45 * 60 * 1000), // Started 45 minutes ago
+    completedAt: null,
+  },
+  {
+    taskType: "cleaning",
+    status: "completed",
+    assignedTo: "Ana Rodriguez",
+    priority: "medium",
+    notes: "Post-checkout cleaning completed",
+    estimatedDuration: 45,
+    actualDuration: 40,
+    startedAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // Started 2 hours ago
+    completedAt: new Date(Date.now() - 80 * 60 * 1000), // Completed 80 minutes ago
+  },
+  {
+    taskType: "inspection",
+    status: "completed",
+    assignedTo: "Lisa Chen",
+    priority: "low",
+    notes: "Quality check after maintenance work",
+    estimatedDuration: 20,
+    actualDuration: 25,
+    startedAt: new Date(Date.now() - 3 * 60 * 60 * 1000), // Started 3 hours ago
+    completedAt: new Date(Date.now() - 2.5 * 60 * 60 * 1000), // Completed 2.5 hours ago
+  },
+  {
+    taskType: "cleaning",
+    status: "pending",
+    assignedTo: null,
+    priority: "low",
+    notes: "Routine weekly deep cleaning",
+    estimatedDuration: 90,
+    actualDuration: null,
+    startedAt: null,
+    completedAt: null,
+  },
+]
 
 async function seedHousekeepingTasks() {
   const client = new MongoClient(MONGODB_URI)
@@ -15,7 +104,7 @@ async function seedHousekeepingTasks() {
 
     const db = client.db()
 
-    // Get existing rooms to reference
+    // Get existing rooms to assign tasks to
     const rooms = await db.collection("rooms").find({}).toArray()
 
     if (rooms.length === 0) {
@@ -23,132 +112,69 @@ async function seedHousekeepingTasks() {
       return
     }
 
+    console.log(`Found ${rooms.length} rooms`)
+
     // Clear existing housekeeping tasks
-    await db.collection("housekeepingtasks").deleteMany({})
+    await db.collection("housekeeping_tasks").deleteMany({})
     console.log("Cleared existing housekeeping tasks")
 
-    const housekeepingStaff = ["Maria Garcia", "Carlos Rodriguez", "Ana Martinez", "Luis Fernandez", "Sofia Morales"]
-
-    const taskTypes = ["cleaning", "maintenance", "inspection"]
-    const priorities = ["low", "medium", "high"]
-    const statuses = ["pending", "in-progress", "completed"]
-
-    const sampleTasks = []
-
-    // Create sample tasks for different rooms
-    for (let i = 0; i < 20; i++) {
-      const room = rooms[Math.floor(Math.random() * rooms.length)]
-      const taskType = taskTypes[Math.floor(Math.random() * taskTypes.length)]
-      const priority = priorities[Math.floor(Math.random() * priorities.length)]
-      const status = statuses[Math.floor(Math.random() * statuses.length)]
-      const assignedTo =
-        Math.random() > 0.3 ? housekeepingStaff[Math.floor(Math.random() * housekeepingStaff.length)] : null
-
-      const createdAt = new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000) // Random date within last week
-
-      const task = {
-        roomId: room._id,
-        taskType,
-        status,
-        assignedTo,
-        priority,
-        notes: getRandomNotes(taskType),
-        estimatedDuration: getEstimatedDuration(taskType),
-        actualDuration: status === "completed" ? Math.floor(Math.random() * 60) + 15 : null,
-        createdAt,
-        startedAt: status !== "pending" ? new Date(createdAt.getTime() + Math.random() * 60 * 60 * 1000) : null,
-        completedAt: status === "completed" ? new Date(createdAt.getTime() + Math.random() * 4 * 60 * 60 * 1000) : null,
+    // Create tasks with random room assignments
+    const tasksToInsert = SAMPLE_TASKS.map((task, index) => {
+      const randomRoom = rooms[index % rooms.length]
+      return {
+        ...task,
+        roomId: randomRoom._id,
+        createdAt: new Date(Date.now() - (8 - index) * 60 * 60 * 1000), // Spread over last 8 hours
+        updatedAt: new Date(),
       }
+    })
 
-      sampleTasks.push(task)
-    }
-
-    // Insert sample tasks
-    const result = await db.collection("housekeepingtasks").insertMany(sampleTasks)
+    // Insert tasks
+    const result = await db.collection("housekeeping_tasks").insertMany(tasksToInsert)
     console.log(`Inserted ${result.insertedCount} housekeeping tasks`)
 
-    // Create some specific high-priority tasks
-    const urgentTasks = [
-      {
-        roomId: rooms[0]._id,
-        taskType: "maintenance",
-        status: "pending",
-        assignedTo: null,
-        priority: "high",
-        notes: "Air conditioning not working - guest complaint",
-        estimatedDuration: 120,
-        actualDuration: null,
-        createdAt: new Date(),
-        startedAt: null,
-        completedAt: null,
-      },
-      {
-        roomId: rooms[1]._id,
-        taskType: "cleaning",
-        status: "pending",
-        assignedTo: null,
-        priority: "high",
-        notes: "Deep cleaning required after checkout",
-        estimatedDuration: 90,
-        actualDuration: null,
-        createdAt: new Date(),
-        startedAt: null,
-        completedAt: null,
-      },
-    ]
+    // Display statistics
+    const stats = await db
+      .collection("housekeeping_tasks")
+      .aggregate([
+        {
+          $group: {
+            _id: "$status",
+            count: { $sum: 1 },
+          },
+        },
+      ])
+      .toArray()
 
-    const urgentResult = await db.collection("housekeepingtasks").insertMany(urgentTasks)
-    console.log(`Inserted ${urgentResult.insertedCount} urgent tasks`)
+    console.log("\nHousekeeping Tasks by Status:")
+    stats.forEach((stat) => {
+      console.log(`  ${stat._id}: ${stat.count}`)
+    })
 
-    console.log("Housekeeping tasks seeded successfully!")
+    const priorityStats = await db
+      .collection("housekeeping_tasks")
+      .aggregate([
+        {
+          $group: {
+            _id: "$priority",
+            count: { $sum: 1 },
+          },
+        },
+      ])
+      .toArray()
+
+    console.log("\nHousekeeping Tasks by Priority:")
+    priorityStats.forEach((stat) => {
+      console.log(`  ${stat._id}: ${stat.count}`)
+    })
+
+    console.log("\nHousekeeping tasks seeded successfully!")
   } catch (error) {
     console.error("Error seeding housekeeping tasks:", error)
   } finally {
     await client.close()
+    console.log("Disconnected from MongoDB")
   }
-}
-
-function getRandomNotes(taskType) {
-  const notes = {
-    cleaning: [
-      "Standard room cleaning",
-      "Deep cleaning required",
-      "Guest checkout - full cleaning needed",
-      "Stains on carpet need attention",
-      "Bathroom needs extra attention",
-      "",
-    ],
-    maintenance: [
-      "Leaky faucet reported",
-      "Light bulb replacement needed",
-      "Air conditioning check",
-      "Door lock maintenance",
-      "Window cleaning",
-      "Furniture repair needed",
-      "",
-    ],
-    inspection: [
-      "Monthly room inspection",
-      "Safety equipment check",
-      "Amenities inventory",
-      "Quality control check",
-      "",
-    ],
-  }
-
-  const typeNotes = notes[taskType] || [""]
-  return typeNotes[Math.floor(Math.random() * typeNotes.length)]
-}
-
-function getEstimatedDuration(taskType) {
-  const durations = {
-    cleaning: [30, 45, 60, 90],
-    maintenance: [60, 90, 120, 180],
-    inspection: [15, 30, 45],
-  }
-
-  const typeDurations = durations[taskType] || [30]
-  return typeDurations[Math.floor(Math.random() * typeDurations.length)]
 }
 
 // Run the seeding function

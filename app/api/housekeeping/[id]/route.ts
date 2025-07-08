@@ -1,71 +1,71 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { connectToDatabase } from "@/lib/mongodb"
-import HousekeepingTask from "@/lib/models/HousekeepingTask"
-import Room from "@/lib/models/Room"
-
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    await connectToDatabase()
-
-    const task = await HousekeepingTask.findById(params.id).populate("roomId", "number floor type status")
-
-    if (!task) {
-      return NextResponse.json({ error: "Housekeeping task not found" }, { status: 404 })
-    }
-
-    return NextResponse.json(task)
-  } catch (error) {
-    console.error("Error fetching housekeeping task:", error)
-    return NextResponse.json({ error: "Failed to fetch housekeeping task" }, { status: 500 })
-  }
-}
+import { ObjectId } from "mongodb"
+import type { UpdateHousekeepingTaskData } from "@/lib/models/HousekeepingTask"
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await connectToDatabase()
+    const body: UpdateHousekeepingTaskData = await request.json()
+    const { db } = await connectToDatabase()
 
-    const body = await request.json()
-    const { status, assignedTo, notes, actualDuration } = body
-
-    const updateData: any = {}
-
-    if (status) {
-      updateData.status = status
-
-      if (status === "in-progress" && !updateData.startedAt) {
-        updateData.startedAt = new Date()
-      }
-
-      if (status === "completed") {
-        updateData.completedAt = new Date()
-        if (actualDuration) {
-          updateData.actualDuration = actualDuration
-        }
-      }
+    const updateData: any = {
+      ...body,
+      updatedAt: new Date(),
     }
 
-    if (assignedTo !== undefined) updateData.assignedTo = assignedTo
-    if (notes !== undefined) updateData.notes = notes
-    if (actualDuration !== undefined) updateData.actualDuration = actualDuration
+    // If status is being changed to in-progress, set startedAt
+    if (body.status === "in-progress" && !body.startedAt) {
+      updateData.startedAt = new Date()
+    }
 
-    const task = await HousekeepingTask.findByIdAndUpdate(params.id, updateData, { new: true }).populate(
-      "roomId",
-      "number floor type status",
-    )
+    // If status is being changed to completed, set completedAt
+    if (body.status === "completed" && !body.completedAt) {
+      updateData.completedAt = new Date()
+    }
 
-    if (!task) {
+    const result = await db
+      .collection("housekeeping_tasks")
+      .updateOne({ _id: new ObjectId(params.id) }, { $set: updateData })
+
+    if (result.matchedCount === 0) {
       return NextResponse.json({ error: "Housekeeping task not found" }, { status: 404 })
     }
 
     // If task is completed and it's a cleaning task, update room status
-    if (status === "completed" && task.taskType === "cleaning") {
-      await Room.findByIdAndUpdate(task.roomId._id, {
-        status: "available",
-        lastCleaned: new Date(),
-      })
+    if (body.status === "completed") {
+      const task = await db.collection("housekeeping_tasks").findOne({ _id: new ObjectId(params.id) })
+
+      if (task && task.taskType === "cleaning") {
+        await db.collection("rooms").updateOne(
+          { _id: new ObjectId(task.roomId) },
+          {
+            $set: {
+              status: "available",
+              lastCleaned: new Date(),
+              updatedAt: new Date(),
+            },
+          },
+        )
+      }
     }
 
-    return NextResponse.json(task)
+    const updatedTask = await db
+      .collection("housekeeping_tasks")
+      .aggregate([
+        { $match: { _id: new ObjectId(params.id) } },
+        {
+          $lookup: {
+            from: "rooms",
+            localField: "roomId",
+            foreignField: "_id",
+            as: "room",
+          },
+        },
+        { $unwind: "$room" },
+      ])
+      .toArray()
+
+    return NextResponse.json(updatedTask[0])
   } catch (error) {
     console.error("Error updating housekeeping task:", error)
     return NextResponse.json({ error: "Failed to update housekeeping task" }, { status: 500 })
@@ -74,11 +74,11 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await connectToDatabase()
+    const { db } = await connectToDatabase()
 
-    const task = await HousekeepingTask.findByIdAndDelete(params.id)
+    const result = await db.collection("housekeeping_tasks").deleteOne({ _id: new ObjectId(params.id) })
 
-    if (!task) {
+    if (result.deletedCount === 0) {
       return NextResponse.json({ error: "Housekeeping task not found" }, { status: 404 })
     }
 

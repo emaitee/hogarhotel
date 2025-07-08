@@ -1,31 +1,23 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { toast } from "sonner"
+import type {
+  HousekeepingTask,
+  CreateHousekeepingTaskData,
+  UpdateHousekeepingTaskData,
+} from "@/lib/models/HousekeepingTask"
 
-export interface HousekeepingTask {
-  _id: string
-  roomId: {
+interface HousekeepingTaskWithRoom extends HousekeepingTask {
+  room: {
     _id: string
     number: string
-    floor: number
     type: string
     status: string
   }
-  taskType: "cleaning" | "maintenance" | "inspection"
-  status: "pending" | "in-progress" | "completed"
-  assignedTo?: string
-  priority: "low" | "medium" | "high"
-  notes?: string
-  estimatedDuration: number
-  actualDuration?: number
-  createdAt: string
-  startedAt?: string
-  completedAt?: string
 }
 
 export function useHousekeeping() {
-  const [tasks, setTasks] = useState<HousekeepingTask[]>([])
+  const [tasks, setTasks] = useState<HousekeepingTaskWithRoom[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -33,30 +25,20 @@ export function useHousekeeping() {
     try {
       setLoading(true)
       const response = await fetch("/api/housekeeping")
-
       if (!response.ok) {
         throw new Error("Failed to fetch housekeeping tasks")
       }
-
       const data = await response.json()
       setTasks(data)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")
-      toast.error("Failed to fetch housekeeping tasks")
     } finally {
       setLoading(false)
     }
   }
 
-  const createTask = async (taskData: {
-    roomId: string
-    taskType: "cleaning" | "maintenance" | "inspection"
-    priority?: "low" | "medium" | "high"
-    notes?: string
-    assignedTo?: string
-    estimatedDuration?: number
-  }) => {
+  const createTask = async (taskData: CreateHousekeepingTaskData) => {
     try {
       const response = await fetch("/api/housekeeping", {
         method: "POST",
@@ -67,52 +49,36 @@ export function useHousekeeping() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to create task")
+        throw new Error("Failed to create housekeeping task")
       }
 
       const newTask = await response.json()
       setTasks((prev) => [newTask, ...prev])
-      toast.success("Housekeeping task created successfully")
       return newTask
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to create task"
-      toast.error(errorMessage)
-      throw err
+      throw new Error(err instanceof Error ? err.message : "An error occurred")
     }
   }
 
-  const updateTask = async (
-    id: string,
-    updates: {
-      status?: "pending" | "in-progress" | "completed"
-      assignedTo?: string
-      notes?: string
-      actualDuration?: number
-    },
-  ) => {
+  const updateTask = async (id: string, updateData: UpdateHousekeepingTaskData) => {
     try {
       const response = await fetch(`/api/housekeeping/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(updates),
+        body: JSON.stringify(updateData),
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to update task")
+        throw new Error("Failed to update housekeeping task")
       }
 
       const updatedTask = await response.json()
-      setTasks((prev) => prev.map((task) => (task._id === id ? updatedTask : task)))
-      toast.success("Task updated successfully")
+      setTasks((prev) => prev.map((task) => (task._id?.toString() === id ? updatedTask : task)))
       return updatedTask
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to update task"
-      toast.error(errorMessage)
-      throw err
+      throw new Error(err instanceof Error ? err.message : "An error occurred")
     }
   }
 
@@ -123,25 +89,13 @@ export function useHousekeeping() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to delete task")
+        throw new Error("Failed to delete housekeeping task")
       }
 
-      setTasks((prev) => prev.filter((task) => task._id !== id))
-      toast.success("Task deleted successfully")
+      setTasks((prev) => prev.filter((task) => task._id?.toString() !== id))
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to delete task"
-      toast.error(errorMessage)
-      throw err
+      throw new Error(err instanceof Error ? err.message : "An error occurred")
     }
-  }
-
-  const assignTask = async (id: string, assignedTo: string) => {
-    return updateTask(id, { assignedTo, status: "in-progress" })
-  }
-
-  const completeTask = async (id: string, actualDuration?: number) => {
-    return updateTask(id, { status: "completed", actualDuration })
   }
 
   useEffect(() => {
@@ -156,7 +110,5 @@ export function useHousekeeping() {
     createTask,
     updateTask,
     deleteTask,
-    assignTask,
-    completeTask,
   }
 }

@@ -1,32 +1,24 @@
-import type { ObjectId } from "mongodb"
+import mongoose, { Schema, type Document } from "mongoose"
 
-export interface Room {
-  _id?: ObjectId
-  number: string
-  floor: number
-  type: "standard" | "deluxe" | "suite"
-  status: "available" | "occupied" | "maintenance" | "cleaning"
+export interface IRoom extends Document {
+  name: string
+  description: string
+  images: string[]
   price: number
   amenities: string[]
-  lastCleaned?: Date
-  createdAt: Date
-  updatedAt: Date
+  lastCleaned: Date | null
 }
 
-export interface CreateRoomData {
-  number: string
-  floor: number
-  type: "standard" | "deluxe" | "suite"
-  price: number
-  amenities: string[]
-}
+const RoomSchema: Schema = new Schema({
+  name: { type: String, required: true },
+  description: { type: String, required: true },
+  images: { type: [String], required: true },
+  price: { type: Number, required: true },
+  amenities: { type: [String], required: true },
+  lastCleaned: {
+    type: Date,
+    default: null,
+  },
+})
 
-export interface UpdateRoomData {
-  number?: string
-  floor?: number
-  type?: "standard" | "deluxe" | "suite"
-  status?: "available" | "occupied" | "maintenance" | "cleaning"
-  price?: number
-  amenities?: string[]
-  lastCleaned?: Date
-}
+export default mongoose.model<IRoom>("Room", RoomSchema)

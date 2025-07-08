@@ -1,13 +1,31 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { connectToDatabase } from "@/lib/mongodb"
-import HousekeepingTask from "@/lib/models/HousekeepingTask"
-import Room from "@/lib/models/Room"
+import { ObjectId } from "mongodb"
+import type { CreateHousekeepingTaskData, HousekeepingTask } from "@/lib/models/HousekeepingTask"
 
 export async function GET() {
   try {
-    await connectToDatabase()
+    const { db } = await connectToDatabase()
 
-    const tasks = await HousekeepingTask.find().populate("roomId", "number floor type").sort({ createdAt: -1 })
+    const tasks = await db
+      .collection<HousekeepingTask>("housekeeping_tasks")
+      .aggregate([
+        {
+          $lookup: {
+            from: "rooms",
+            localField: "roomId",
+            foreignField: "_id",
+            as: "room",
+          },
+        },
+        {
+          $unwind: "$room",
+        },
+        {
+          $sort: { createdAt: -1 },
+        },
+      ])
+      .toArray()
 
     return NextResponse.json(tasks)
   } catch (error) {
@@ -18,37 +36,42 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    await connectToDatabase()
+    const body: CreateHousekeepingTaskData = await request.json()
+    const { db } = await connectToDatabase()
 
-    const body = await request.json()
-    const { roomId, taskType, priority, notes, assignedTo, estimatedDuration } = body
-
-    // Validate required fields
-    if (!roomId || !taskType) {
-      return NextResponse.json({ error: "Room ID and task type are required" }, { status: 400 })
-    }
-
-    // Check if room exists
-    const room = await Room.findById(roomId)
+    // Validate room exists
+    const room = await db.collection("rooms").findOne({ _id: new ObjectId(body.roomId) })
     if (!room) {
       return NextResponse.json({ error: "Room not found" }, { status: 404 })
     }
 
-    const task = new HousekeepingTask({
-      roomId,
-      taskType,
-      priority: priority || "medium",
-      notes: notes || "",
-      assignedTo: assignedTo || null,
-      estimatedDuration: estimatedDuration || 30,
-    })
+    const newTask: Omit<HousekeepingTask, "_id"> = {
+      ...body,
+      roomId: new ObjectId(body.roomId),
+      status: "pending",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
 
-    await task.save()
+    const result = await db.collection("housekeeping_tasks").insertOne(newTask)
 
-    // Populate room data before returning
-    await task.populate("roomId", "number floor type")
+    const createdTask = await db
+      .collection("housekeeping_tasks")
+      .aggregate([
+        { $match: { _id: result.insertedId } },
+        {
+          $lookup: {
+            from: "rooms",
+            localField: "roomId",
+            foreignField: "_id",
+            as: "room",
+          },
+        },
+        { $unwind: "$room" },
+      ])
+      .toArray()
 
-    return NextResponse.json(task, { status: 201 })
+    return NextResponse.json(createdTask[0], { status: 201 })
   } catch (error) {
     console.error("Error creating housekeeping task:", error)
     return NextResponse.json({ error: "Failed to create housekeeping task" }, { status: 500 })

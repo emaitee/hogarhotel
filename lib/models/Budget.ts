@@ -1,6 +1,6 @@
 import mongoose from "mongoose"
 
-const BudgetCategorySchema = new mongoose.Schema({
+const budgetItemSchema = new mongoose.Schema({
   categoryId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "TransactionCategory",
@@ -25,23 +25,30 @@ const BudgetCategorySchema = new mongoose.Schema({
   },
 })
 
-const BudgetSchema = new mongoose.Schema(
+const budgetSchema = new mongoose.Schema(
   {
     name: {
       type: String,
       required: true,
       trim: true,
     },
-    year: {
-      type: Number,
+    description: {
+      type: String,
+      trim: true,
+    },
+    period: {
+      type: String,
+      enum: ["monthly", "quarterly", "yearly"],
       required: true,
     },
-    month: {
-      type: Number,
-      min: 1,
-      max: 12,
+    startDate: {
+      type: Date,
+      required: true,
     },
-    categories: [BudgetCategorySchema],
+    endDate: {
+      type: Date,
+      required: true,
+    },
     totalBudget: {
       type: Number,
       required: true,
@@ -51,14 +58,27 @@ const BudgetSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    variance: {
+    totalVariance: {
       type: Number,
       default: 0,
     },
     status: {
       type: String,
-      enum: ["draft", "approved", "active"],
+      enum: ["draft", "active", "completed", "archived"],
       default: "draft",
+    },
+    items: [budgetItemSchema],
+    createdBy: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    approvedBy: {
+      type: String,
+      trim: true,
+    },
+    approvedAt: {
+      type: Date,
     },
   },
   {
@@ -66,7 +86,9 @@ const BudgetSchema = new mongoose.Schema(
   },
 )
 
-BudgetSchema.index({ year: 1, month: 1 })
-BudgetSchema.index({ status: 1 })
+budgetSchema.index({ period: 1 })
+budgetSchema.index({ status: 1 })
+budgetSchema.index({ startDate: 1, endDate: 1 })
+budgetSchema.index({ createdBy: 1 })
 
-export default mongoose.models.Budget || mongoose.model("Budget", BudgetSchema)
+export default mongoose.models.Budget || mongoose.model("Budget", budgetSchema)

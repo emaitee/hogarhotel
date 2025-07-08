@@ -4,98 +4,25 @@ const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/hotel-manageme
 
 const categories = [
   // Income Categories
-  {
-    name: "Room Revenue",
-    type: "income",
-    color: "#10B981",
-    description: "Revenue from room bookings",
-    isActive: true,
-  },
-  {
-    name: "Food & Beverage",
-    type: "income",
-    color: "#3B82F6",
-    description: "Revenue from restaurant and bar services",
-    isActive: true,
-  },
-  {
-    name: "Event Services",
-    type: "income",
-    color: "#8B5CF6",
-    description: "Revenue from events and conferences",
-    isActive: true,
-  },
-  {
-    name: "Spa & Wellness",
-    type: "income",
-    color: "#06B6D4",
-    description: "Revenue from spa and wellness services",
-    isActive: true,
-  },
-  {
-    name: "Other Services",
-    type: "income",
-    color: "#84CC16",
-    description: "Revenue from miscellaneous services",
-    isActive: true,
-  },
+  { name: "Room Revenue", type: "income", description: "Revenue from room bookings", color: "#10B981" },
+  { name: "Food & Beverage", type: "income", description: "Restaurant and bar revenue", color: "#059669" },
+  { name: "Event Services", type: "income", description: "Conference and event hosting", color: "#047857" },
+  { name: "Spa Services", type: "income", description: "Spa and wellness services", color: "#065F46" },
+  { name: "Other Services", type: "income", description: "Miscellaneous service revenue", color: "#064E3B" },
 
   // Expense Categories
-  {
-    name: "Utilities",
-    type: "expense",
-    color: "#EF4444",
-    description: "Electricity, water, gas, internet",
-    isActive: true,
-  },
-  {
-    name: "Staff Salaries",
-    type: "expense",
-    color: "#F59E0B",
-    description: "Employee salaries and wages",
-    isActive: true,
-  },
-  {
-    name: "Maintenance",
-    type: "expense",
-    color: "#6B7280",
-    description: "Property and equipment maintenance",
-    isActive: true,
-  },
-  {
-    name: "Marketing",
-    type: "expense",
-    color: "#EC4899",
-    description: "Advertising and promotional expenses",
-    isActive: true,
-  },
-  {
-    name: "Supplies",
-    type: "expense",
-    color: "#14B8A6",
-    description: "Office and operational supplies",
-    isActive: true,
-  },
-  {
-    name: "Insurance",
-    type: "expense",
-    color: "#F97316",
-    description: "Insurance premiums and coverage",
-    isActive: true,
-  },
-  {
-    name: "Professional Services",
-    type: "expense",
-    color: "#8B5CF6",
-    description: "Legal, accounting, consulting fees",
-    isActive: true,
-  },
+  { name: "Utilities", type: "expense", description: "Electricity, water, gas, internet", color: "#EF4444" },
+  { name: "Maintenance", type: "expense", description: "Property and equipment maintenance", color: "#DC2626" },
+  { name: "Staff Salaries", type: "expense", description: "Employee wages and benefits", color: "#B91C1C" },
+  { name: "Marketing", type: "expense", description: "Advertising and promotional expenses", color: "#991B1B" },
+  { name: "Supplies", type: "expense", description: "Office and operational supplies", color: "#7F1D1D" },
+  { name: "Insurance", type: "expense", description: "Property and liability insurance", color: "#6B1D1D" },
+  { name: "Professional Services", type: "expense", description: "Legal, accounting, consulting", color: "#5B1D1D" },
   {
     name: "Travel & Entertainment",
     type: "expense",
-    color: "#06B6D4",
     description: "Business travel and client entertainment",
-    isActive: true,
+    color: "#4B1D1D",
   },
 ]
 
@@ -114,11 +41,18 @@ async function seedTransactionCategories() {
     console.log("Cleared existing transaction categories")
 
     // Insert new categories
-    const result = await collection.insertMany(categories)
+    const result = await collection.insertMany(
+      categories.map((category) => ({
+        ...category,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })),
+    )
+
     console.log(`Inserted ${result.insertedCount} transaction categories`)
 
     // Display inserted categories
-    console.log("\nInserted Categories:")
     categories.forEach((category, index) => {
       console.log(`${index + 1}. ${category.name} (${category.type}) - ${category.color}`)
     })
@@ -126,7 +60,6 @@ async function seedTransactionCategories() {
     console.error("Error seeding transaction categories:", error)
   } finally {
     await client.close()
-    console.log("Disconnected from MongoDB")
   }
 }
 

@@ -1,11 +1,11 @@
 import mongoose from "mongoose"
 
-const TaxRecordSchema = new mongoose.Schema(
+const taxRecordSchema = new mongoose.Schema(
   {
-    type: {
+    taxType: {
       type: String,
-      enum: ["vat", "income_tax", "withholding_tax"],
       required: true,
+      enum: ["income_tax", "sales_tax", "property_tax", "payroll_tax", "other"],
     },
     period: {
       startDate: {
@@ -35,20 +35,24 @@ const TaxRecordSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "filed", "paid"],
+      enum: ["pending", "filed", "paid", "overdue"],
       default: "pending",
     },
     dueDate: {
       type: Date,
       required: true,
     },
-    filedAt: {
+    filedDate: {
       type: Date,
     },
-    paidAt: {
+    paidDate: {
       type: Date,
     },
     reference: {
+      type: String,
+      trim: true,
+    },
+    description: {
       type: String,
       trim: true,
     },
@@ -56,15 +60,26 @@ const TaxRecordSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    filedBy: {
+      type: String,
+      trim: true,
+    },
+    attachments: [
+      {
+        name: String,
+        url: String,
+        uploadedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   {
     timestamps: true,
   },
 )
 
-TaxRecordSchema.index({ type: 1 })
-TaxRecordSchema.index({ status: 1 })
-TaxRecordSchema.index({ dueDate: 1 })
-TaxRecordSchema.index({ "period.startDate": 1, "period.endDate": 1 })
+taxRecordSchema.index({ taxType: 1 })
+taxRecordSchema.index({ status: 1 })
+taxRecordSchema.index({ dueDate: 1 })
+taxRecordSchema.index({ "period.startDate": 1, "period.endDate": 1 })
 
-export default mongoose.models.TaxRecord || mongoose.model("TaxRecord", TaxRecordSchema)
+export default mongoose.models.TaxRecord || mongoose.model("TaxRecord", taxRecordSchema)

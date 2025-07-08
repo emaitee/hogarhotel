@@ -6,7 +6,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   try {
     await connectDB()
 
-    const expense = await Expense.findById(params.id).populate("categoryId", "name color type").lean()
+    const expense = await Expense.findById(params.id).populate("categoryId", "name type color").lean()
 
     if (!expense) {
       return NextResponse.json({ error: "Expense not found" }, { status: 404 })
@@ -24,34 +24,23 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     await connectDB()
 
     const body = await request.json()
-    const { date, vendor, description, categoryId, amount, paymentMethod, reference, notes, status, approvedBy } = body
-
-    const updateData: any = {
-      date,
-      vendor,
-      description,
-      categoryId,
-      amount,
-      paymentMethod,
-      reference,
-      notes,
-    }
+    const { status, approvedBy, ...updateData } = body
 
     // Handle status changes
     if (status) {
-      updateData.status = status
-      if (status === "approved" && approvedBy) {
-        updateData.approvedBy = approvedBy
+      if (status === "approved") {
+        updateData.approvedBy = approvedBy || "system"
         updateData.approvedAt = new Date()
       } else if (status === "paid") {
         updateData.paidAt = new Date()
       }
+      updateData.status = status
     }
 
-    const expense = await Expense.findByIdAndUpdate(params.id, updateData, { new: true, runValidators: true }).populate(
-      "categoryId",
-      "name color type",
-    )
+    const expense = await Expense.findByIdAndUpdate(params.id, updateData, {
+      new: true,
+      runValidators: true,
+    }).populate("categoryId", "name type color")
 
     if (!expense) {
       return NextResponse.json({ error: "Expense not found" }, { status: 404 })

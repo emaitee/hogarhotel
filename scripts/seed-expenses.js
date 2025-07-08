@@ -2,152 +2,29 @@ const { MongoClient, ObjectId } = require("mongodb")
 
 const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/hotel-management"
 
-const sampleExpenses = [
-  {
-    date: new Date("2024-01-15"),
-    vendor: "Office Supplies Co.",
-    description: "Office stationery and supplies",
-    amount: 25000,
-    paymentMethod: "bank_transfer",
-    reference: "INV-2024-001",
-    status: "paid",
-    notes: "Monthly office supplies",
-    createdBy: "admin",
-    paidAt: new Date("2024-01-16"),
-  },
-  {
-    date: new Date("2024-01-20"),
-    vendor: "Utility Company",
-    description: "Electricity bill for January",
-    amount: 150000,
-    paymentMethod: "bank_transfer",
-    reference: "ELEC-2024-001",
-    status: "approved",
-    notes: "Monthly electricity bill",
-    createdBy: "admin",
-    approvedBy: "manager",
-    approvedAt: new Date("2024-01-21"),
-  },
-  {
-    date: new Date("2024-01-25"),
-    vendor: "Cleaning Services Ltd",
-    description: "Professional cleaning services",
-    amount: 75000,
-    paymentMethod: "cash",
-    reference: "CLEAN-2024-001",
-    status: "pending",
-    notes: "Weekly cleaning service",
-    createdBy: "staff",
-  },
-  {
-    date: new Date("2024-02-01"),
-    vendor: "Food Supplier Inc",
-    description: "Restaurant ingredients and supplies",
-    amount: 200000,
-    paymentMethod: "bank_transfer",
-    reference: "FOOD-2024-001",
-    status: "paid",
-    notes: "Weekly food supplies",
-    createdBy: "chef",
-    paidAt: new Date("2024-02-02"),
-  },
-  {
-    date: new Date("2024-02-05"),
-    vendor: "Maintenance Co",
-    description: "HVAC system maintenance",
-    amount: 120000,
-    paymentMethod: "cheque",
-    reference: "MAINT-2024-001",
-    status: "approved",
-    notes: "Quarterly HVAC maintenance",
-    createdBy: "maintenance",
-    approvedBy: "manager",
-    approvedAt: new Date("2024-02-06"),
-  },
+const vendors = [
+  "ABC Electric Company",
+  "City Water Department",
+  "Metro Gas Services",
+  "Office Supply Plus",
+  "Professional Cleaning Co",
+  "Security Systems Inc",
+  "Maintenance Masters",
+  "Food Distributors LLC",
+  "Linen Supply Co",
+  "Tech Solutions Inc",
 ]
 
-const sampleBudgets = [
-  {
-    name: "Q1 2024 Operations Budget",
-    year: 2024,
-    period: "quarterly",
-    status: "active",
-    createdBy: "admin",
-    approvedBy: "manager",
-    approvedAt: new Date("2024-01-01"),
-  },
-  {
-    name: "January 2024 Monthly Budget",
-    year: 2024,
-    month: 1,
-    period: "monthly",
-    status: "closed",
-    createdBy: "admin",
-    approvedBy: "manager",
-    approvedAt: new Date("2024-01-01"),
-  },
-  {
-    name: "Annual 2024 Budget",
-    year: 2024,
-    period: "annual",
-    status: "approved",
-    createdBy: "admin",
-    approvedBy: "ceo",
-    approvedAt: new Date("2023-12-15"),
-  },
-]
+const paymentMethods = ["cash", "check", "credit_card", "bank_transfer"]
+const statuses = ["pending", "approved", "paid", "rejected"]
 
-const sampleTaxRecords = [
-  {
-    taxType: "VAT",
-    period: "2024-01",
-    taxableAmount: 2000000,
-    taxRate: 7.5,
-    dueDate: new Date("2024-02-21"),
-    status: "paid",
-    reference: "VAT-2024-001",
-    notes: "January VAT return",
-    createdBy: "accountant",
-    filedBy: "accountant",
-    filedDate: new Date("2024-02-15"),
-    paidDate: new Date("2024-02-20"),
-  },
-  {
-    taxType: "Corporate Income Tax",
-    period: "2023",
-    taxableAmount: 5000000,
-    taxRate: 30,
-    dueDate: new Date("2024-03-31"),
-    status: "filed",
-    reference: "CIT-2023-001",
-    notes: "2023 Corporate Income Tax",
-    createdBy: "accountant",
-    filedBy: "accountant",
-    filedDate: new Date("2024-03-15"),
-  },
-  {
-    taxType: "Withholding Tax",
-    period: "2024-01",
-    taxableAmount: 800000,
-    taxRate: 10,
-    dueDate: new Date("2024-02-21"),
-    status: "pending",
-    reference: "WHT-2024-001",
-    notes: "January Withholding Tax",
-    createdBy: "accountant",
-  },
-  {
-    taxType: "VAT",
-    period: "2024-02",
-    taxableAmount: 2200000,
-    taxRate: 7.5,
-    dueDate: new Date("2024-03-21"),
-    status: "overdue",
-    reference: "VAT-2024-002",
-    notes: "February VAT return - overdue",
-    createdBy: "accountant",
-  },
-]
+function getRandomDate(start, end) {
+  return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()))
+}
+
+function getRandomAmount(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min
+}
 
 async function seedAccountingData() {
   const client = new MongoClient(uri)
@@ -172,21 +49,215 @@ async function seedAccountingData() {
     }
 
     // Assign random categories to expenses
-    const expensesWithCategories = sampleExpenses.map((expense) => ({
-      ...expense,
-      categoryId: expenseCategories[Math.floor(Math.random() * expenseCategories.length)]._id,
-    }))
+    const sampleExpenses = [
+      {
+        date: new Date("2024-01-15"),
+        vendor: "Office Supplies Co.",
+        description: "Office stationery and supplies",
+        amount: 25000,
+        paymentMethod: "bank_transfer",
+        reference: "INV-2024-001",
+        status: "paid",
+        notes: "Monthly office supplies",
+        createdBy: "admin",
+        paidAt: new Date("2024-01-16"),
+      },
+      {
+        date: new Date("2024-01-20"),
+        vendor: "Utility Company",
+        description: "Electricity bill for January",
+        amount: 150000,
+        paymentMethod: "bank_transfer",
+        reference: "ELEC-2024-001",
+        status: "approved",
+        notes: "Monthly electricity bill",
+        createdBy: "admin",
+        approvedBy: "manager",
+        approvedAt: new Date("2024-01-21"),
+      },
+      {
+        date: new Date("2024-01-25"),
+        vendor: "Cleaning Services Ltd",
+        description: "Professional cleaning services",
+        amount: 75000,
+        paymentMethod: "cash",
+        reference: "CLEAN-2024-001",
+        status: "pending",
+        notes: "Weekly cleaning service",
+        createdBy: "staff",
+      },
+      {
+        date: new Date("2024-02-01"),
+        vendor: "Food Supplier Inc",
+        description: "Restaurant ingredients and supplies",
+        amount: 200000,
+        paymentMethod: "bank_transfer",
+        reference: "FOOD-2024-001",
+        status: "paid",
+        notes: "Weekly food supplies",
+        createdBy: "chef",
+        paidAt: new Date("2024-02-02"),
+      },
+      {
+        date: new Date("2024-02-05"),
+        vendor: "Maintenance Co",
+        description: "HVAC system maintenance",
+        amount: 120000,
+        paymentMethod: "cheque",
+        reference: "MAINT-2024-001",
+        status: "approved",
+        notes: "Quarterly HVAC maintenance",
+        createdBy: "maintenance",
+        approvedBy: "manager",
+        approvedAt: new Date("2024-02-06"),
+      },
+    ]
+
+    const sampleBudgets = [
+      {
+        name: "Q1 2024 Operations Budget",
+        year: 2024,
+        period: "quarterly",
+        status: "active",
+        createdBy: "admin",
+        approvedBy: "manager",
+        approvedAt: new Date("2024-01-01"),
+      },
+      {
+        name: "January 2024 Monthly Budget",
+        year: 2024,
+        month: 1,
+        period: "monthly",
+        status: "closed",
+        createdBy: "admin",
+        approvedBy: "manager",
+        approvedAt: new Date("2024-01-01"),
+      },
+      {
+        name: "Annual 2024 Budget",
+        year: 2024,
+        period: "annual",
+        status: "approved",
+        createdBy: "admin",
+        approvedBy: "ceo",
+        approvedAt: new Date("2023-12-15"),
+      },
+    ]
+
+    const sampleTaxRecords = [
+      {
+        taxType: "VAT",
+        period: "2024-01",
+        taxableAmount: 2000000,
+        taxRate: 7.5,
+        dueDate: new Date("2024-02-21"),
+        status: "paid",
+        reference: "VAT-2024-001",
+        notes: "January VAT return",
+        createdBy: "accountant",
+        filedBy: "accountant",
+        filedDate: new Date("2024-02-15"),
+        paidDate: new Date("2024-02-20"),
+      },
+      {
+        taxType: "Corporate Income Tax",
+        period: "2023",
+        taxableAmount: 5000000,
+        taxRate: 30,
+        dueDate: new Date("2024-03-31"),
+        status: "filed",
+        reference: "CIT-2023-001",
+        notes: "2023 Corporate Income Tax",
+        createdBy: "accountant",
+        filedBy: "accountant",
+        filedDate: new Date("2024-03-15"),
+      },
+      {
+        taxType: "Withholding Tax",
+        period: "2024-01",
+        taxableAmount: 800000,
+        taxRate: 10,
+        dueDate: new Date("2024-02-21"),
+        status: "pending",
+        reference: "WHT-2024-001",
+        notes: "January Withholding Tax",
+        createdBy: "accountant",
+      },
+      {
+        taxType: "VAT",
+        period: "2024-02",
+        taxableAmount: 2200000,
+        taxRate: 7.5,
+        dueDate: new Date("2024-03-21"),
+        status: "overdue",
+        reference: "VAT-2024-002",
+        notes: "February VAT return - overdue",
+        createdBy: "accountant",
+      },
+    ]
 
     // Clear existing data
     await expensesCollection.deleteMany({})
     await budgetsCollection.deleteMany({})
     await taxRecordsCollection.deleteMany({})
-    await financialReportsCollection.deleteMany({})
+    await financialReportsCollection.deleteMany()
     console.log("Cleared existing data")
 
-    // Insert expenses
+    // Insert sample expenses
+    const expensesWithCategories = sampleExpenses.map((expense) => ({
+      ...expense,
+      categoryId: expenseCategories[Math.floor(Math.random() * expenseCategories.length)]._id,
+    }))
+
     const expenseResult = await expensesCollection.insertMany(expensesWithCategories)
-    console.log(`Inserted ${expenseResult.insertedCount} expenses`)
+    console.log(`Inserted ${expenseResult.insertedCount} sample expenses`)
+
+    // Generate additional expenses for the last 6 months
+    const expenses = []
+    const startDate = new Date(2024, 0, 1) // January 1, 2024
+    const endDate = new Date() // Today
+
+    // Generate 100 additional sample expenses
+    for (let i = 0; i < 100; i++) {
+      const category = expenseCategories[Math.floor(Math.random() * expenseCategories.length)]
+      const vendor = vendors[Math.floor(Math.random() * vendors.length)]
+      const date = getRandomDate(startDate, endDate)
+      const dueDate = new Date(date.getTime() + (Math.random() * 30 + 7) * 24 * 60 * 60 * 1000) // 7-37 days after expense date
+      const status = statuses[Math.floor(Math.random() * statuses.length)]
+      const amount = getRandomAmount(50, 5000)
+
+      const expense = {
+        description: `${category.name} - ${vendor}`,
+        amount,
+        categoryId: category._id,
+        vendor,
+        date,
+        dueDate,
+        status,
+        paymentMethod: paymentMethods[Math.floor(Math.random() * paymentMethods.length)],
+        reference: `EXP-${String(i + 1).padStart(4, "0")}`,
+        notes: `Sample expense for ${category.name}`,
+        tags: [category.name.toLowerCase().replace(/\s+/g, "-")],
+        createdAt: date,
+        updatedAt: date,
+      }
+
+      // Add approval/payment dates based on status
+      if (status === "approved" || status === "paid") {
+        expense.approvedBy = "admin"
+        expense.approvedAt = new Date(date.getTime() + Math.random() * 7 * 24 * 60 * 60 * 1000)
+      }
+
+      if (status === "paid") {
+        expense.paidAt = new Date(expense.approvedAt.getTime() + Math.random() * 14 * 24 * 60 * 60 * 1000)
+      }
+
+      expenses.push(expense)
+    }
+
+    // Insert additional expenses
+    const additionalExpenseResult = await expensesCollection.insertMany(expenses)
+    console.log(`Inserted ${additionalExpenseResult.insertedCount} additional expenses`)
 
     // Create budgets with categories
     const budgetsWithCategories = sampleBudgets.map((budget) => ({
@@ -265,84 +336,28 @@ async function seedAccountingData() {
     const reportResult = await financialReportsCollection.insertOne(sampleReport)
     console.log(`Inserted 1 financial report`)
 
-    // Generate additional expenses for the last 6 months
-    const vendors = [
-      "ABC Utilities Company",
-      "City Power & Light",
-      "Metro Water Works",
-      "Office Supplies Plus",
-      "Professional Cleaning Co",
-      "Tech Solutions Inc",
-      "Marketing Agency Pro",
-      "Insurance Partners LLC",
-      "Legal Services Group",
-      "Maintenance Masters",
-    ]
-
-    const paymentMethods = ["cash", "bank_transfer", "cheque", "card"]
-    const statuses = ["pending", "approved", "paid", "rejected"]
-
-    // Generate expenses for the last 6 months
-    const startDate = new Date()
-    startDate.setMonth(startDate.getMonth() - 6)
-
-    for (let i = 0; i < 100; i++) {
-      const randomDate = new Date(startDate.getTime() + Math.random() * (Date.now() - startDate.getTime()))
-      const randomCategory = expenseCategories[Math.floor(Math.random() * expenseCategories.length)]
-      const randomVendor = vendors[Math.floor(Math.random() * vendors.length)]
-      const randomAmount = Math.floor(Math.random() * 5000) + 100
-      const randomStatus = statuses[Math.floor(Math.random() * statuses.length)]
-      const randomPaymentMethod = paymentMethods[Math.floor(Math.random() * paymentMethods.length)]
-
-      const expense = {
-        date: randomDate,
-        vendor: randomVendor,
-        description: `${randomCategory.name} expense from ${randomVendor}`,
-        categoryId: randomCategory._id,
-        amount: randomAmount,
-        paymentMethod: randomPaymentMethod,
-        reference: `EXP-${Date.now()}-${i}`,
-        status: randomStatus,
-        notes: Math.random() > 0.7 ? "Additional notes for this expense" : undefined,
-        createdBy: "system",
-        createdAt: randomDate,
-        updatedAt: randomDate,
-      }
-
-      // Add approval/payment dates for approved/paid expenses
-      if (randomStatus === "approved" || randomStatus === "paid") {
-        expense.approvedBy = "admin"
-        expense.approvedAt = new Date(randomDate.getTime() + 24 * 60 * 60 * 1000) // Next day
-      }
-
-      if (randomStatus === "paid") {
-        expense.paidAt = new Date(randomDate.getTime() + 48 * 60 * 60 * 1000) // Two days later
-      }
-
-      expensesWithCategories.push(expense)
-    }
-
-    // Insert additional expenses
-    const additionalExpenseResult = await expensesCollection.insertMany(expensesWithCategories.slice(5))
-    console.log(`Inserted ${additionalExpenseResult.insertedCount} additional expenses`)
-
     // Display summary
-    const summary = await expensesCollection
-      .aggregate([
-        {
-          $group: {
-            _id: "$status",
-            count: { $sum: 1 },
-            total: { $sum: "$amount" },
-          },
-        },
-      ])
-      .toArray()
+    const statusCounts = {}
+    const categoryTotals = {}
+
+    const allExpenses = await expensesCollection.find().toArray()
+
+    allExpenses.forEach((expense) => {
+      statusCounts[expense.status] = (statusCounts[expense.status] || 0) + 1
+
+      const categoryName = expenseCategories.find((cat) => cat._id.equals(expense.categoryId))?.name || "Unknown"
+      categoryTotals[categoryName] = (categoryTotals[categoryName] || 0) + expense.amount
+    })
 
     console.log("\nExpense Summary:")
-    summary.forEach((item) => {
-      console.log(`${item._id}: ${item.count} expenses, $${item.total.toFixed(2)}`)
+    console.log("Status breakdown:", statusCounts)
+    console.log("\nCategory totals:")
+    Object.entries(categoryTotals).forEach(([category, total]) => {
+      console.log(`${category}: $${total.toLocaleString()}`)
     })
+
+    const totalAmount = allExpenses.reduce((sum, expense) => sum + expense.amount, 0)
+    console.log(`\nTotal expenses: $${totalAmount.toLocaleString()}`)
 
     console.log("Accounting data seeding completed successfully!")
   } catch (error) {

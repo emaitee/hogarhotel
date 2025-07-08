@@ -1,6 +1,6 @@
 import mongoose from "mongoose"
 
-const TransactionCategorySchema = new mongoose.Schema(
+const transactionCategorySchema = new mongoose.Schema(
   {
     name: {
       type: String,
@@ -12,19 +12,19 @@ const TransactionCategorySchema = new mongoose.Schema(
       enum: ["income", "expense"],
       required: true,
     },
-    color: {
-      type: String,
-      default: "#3B82F6",
-    },
     description: {
       type: String,
       trim: true,
+    },
+    color: {
+      type: String,
+      default: "#3B82F6",
     },
     isActive: {
       type: Boolean,
       default: true,
     },
-    parentId: {
+    parentCategory: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "TransactionCategory",
     },
@@ -34,6 +34,8 @@ const TransactionCategorySchema = new mongoose.Schema(
   },
 )
 
-TransactionCategorySchema.index({ name: 1, type: 1 })
+transactionCategorySchema.index({ name: 1, type: 1 }, { unique: true })
+transactionCategorySchema.index({ type: 1 })
+transactionCategorySchema.index({ isActive: 1 })
 
-export default mongoose.models.TransactionCategory || mongoose.model("TransactionCategory", TransactionCategorySchema)
+export default mongoose.models.TransactionCategory || mongoose.model("TransactionCategory", transactionCategorySchema)

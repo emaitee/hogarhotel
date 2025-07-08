@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     }
 
     const [expenses, total] = await Promise.all([
-      Expense.find(filter).populate("categoryId", "name color type").sort({ date: -1 }).skip(skip).limit(limit).lean(),
+      Expense.find(filter).populate("categoryId", "name type color").sort({ date: -1 }).skip(skip).limit(limit).lean(),
       Expense.countDocuments(filter),
     ])
 
@@ -54,20 +54,10 @@ export async function POST(request: NextRequest) {
     await connectDB()
 
     const body = await request.json()
-    const {
-      date,
-      vendor,
-      description,
-      categoryId,
-      amount,
-      paymentMethod,
-      reference,
-      notes,
-      createdBy = "system",
-    } = body
+    const { description, amount, categoryId, vendor, date, dueDate, paymentMethod, reference, notes, tags } = body
 
     // Validate required fields
-    if (!vendor || !description || !categoryId || !amount || !paymentMethod) {
+    if (!description || !amount || !categoryId || !vendor || !date) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
@@ -78,19 +68,20 @@ export async function POST(request: NextRequest) {
     }
 
     const expense = new Expense({
-      date: date || new Date(),
-      vendor,
       description,
+      amount: Number(amount),
       categoryId,
-      amount,
+      vendor,
+      date: new Date(date),
+      dueDate: dueDate ? new Date(dueDate) : undefined,
       paymentMethod,
       reference,
       notes,
-      createdBy,
+      tags: tags || [],
     })
 
     await expense.save()
-    await expense.populate("categoryId", "name color type")
+    await expense.populate("categoryId", "name type color")
 
     return NextResponse.json(expense, { status: 201 })
   } catch (error) {

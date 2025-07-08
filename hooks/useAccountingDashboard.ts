@@ -20,21 +20,19 @@ interface DashboardMetrics {
   }
   cashFlow: {
     current: number
-    growth: number
+    accounts: number
   }
 }
 
 interface RecentActivity {
-  _id: string
-  date: string
+  id: string
   description: string
-  reference: string
   amount: number
   type: "debit" | "credit"
-  account: {
-    name: string
-    type: string
-  }
+  date: string
+  account: string
+  accountType: string
+  reference?: string
 }
 
 interface DashboardData {
@@ -44,33 +42,40 @@ interface DashboardData {
     type: string
     startDate: string
     endDate: string
+    year: number
+    month?: number
   }
 }
 
-export function useAccountingDashboard(period = "monthly", year?: number, month?: number) {
+interface UseAccountingDashboardReturn {
+  data: DashboardData | null
+  loading: boolean
+  error: string | null
+  refetch: (params?: { period?: string; year?: number; month?: number }) => Promise<void>
+}
+
+export function useAccountingDashboard(
+  initialParams: { period?: string; year?: number; month?: number } = {},
+): UseAccountingDashboardReturn {
   const [data, setData] = useState<DashboardData | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchDashboard = async () => {
+  const fetchDashboard = async (params: { period?: string; year?: number; month?: number } = {}) => {
     try {
       setLoading(true)
       setError(null)
 
-      const params = new URLSearchParams({
-        period,
-        ...(year && { year: year.toString() }),
-        ...(month && { month: month.toString() }),
-      })
+      const searchParams = new URLSearchParams()
+      if (params.period) searchParams.append("period", params.period)
+      if (params.year) searchParams.append("year", params.year.toString())
+      if (params.month) searchParams.append("month", params.month.toString())
 
-      const response = await fetch(`/api/accounting/dashboard?${params}`)
+      const response = await fetch(`/api/accounting/dashboard?${searchParams}`)
+      if (!response.ok) throw new Error("Failed to fetch dashboard data")
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch dashboard data")
-      }
-
-      const result = await response.json()
-      setData(result)
+      const dashboardData = await response.json()
+      setData(dashboardData)
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")
     } finally {
@@ -79,8 +84,8 @@ export function useAccountingDashboard(period = "monthly", year?: number, month?
   }
 
   useEffect(() => {
-    fetchDashboard()
-  }, [period, year, month])
+    fetchDashboard(initialParams)
+  }, [])
 
   return {
     data,

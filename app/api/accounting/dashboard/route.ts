@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { connectDB } from "@/lib/mongodb"
 import Transaction from "@/lib/models/Transaction"
 import Account from "@/lib/models/Account"
+import Expense from "@/lib/models/Expense"
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,7 +11,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const period = searchParams.get("period") || "monthly"
     const year = Number.parseInt(searchParams.get("year") || new Date().getFullYear().toString())
-    const month = searchParams.get("month") ? Number.parseInt(searchParams.get("month")!) : new Date().getMonth() + 1
+    const month = searchParams.get("month") ? Number.parseInt(searchParams.get("month")) : new Date().getMonth() + 1
 
     // Calculate date ranges
     let startDate: Date, endDate: Date, prevStartDate: Date, prevEndDate: Date
@@ -27,208 +28,140 @@ export async function GET(request: NextRequest) {
       prevStartDate = new Date(year, (quarter - 2) * 3, 1)
       prevEndDate = new Date(year, (quarter - 1) * 3, 0)
     } else {
+      // yearly
       startDate = new Date(year, 0, 1)
       endDate = new Date(year, 11, 31)
       prevStartDate = new Date(year - 1, 0, 1)
       prevEndDate = new Date(year - 1, 11, 31)
     }
 
-    const [currentRevenue, currentExpenses, previousRevenue, previousExpenses, cashFlow, recentActivity] =
-      await Promise.all([
-        // Current period revenue
-        Transaction.aggregate([
-          {
-            $lookup: {
-              from: "accounts",
-              localField: "accountId",
-              foreignField: "_id",
-              as: "account",
-            },
-          },
-          {
-            $unwind: "$account",
-          },
-          {
-            $match: {
-              date: { $gte: startDate, $lte: endDate },
-              "account.type": "revenue",
-              type: "credit",
-            },
-          },
-          {
-            $group: {
-              _id: null,
-              total: { $sum: "$amount" },
-            },
-          },
-        ]),
+    // Get revenue accounts
+    const revenueAccounts = await Account.find({ type: "revenue" }).select("_id").lean()
+    const revenueAccountIds = revenueAccounts.map((acc) => acc._id)
 
-        // Current period expenses
-        Transaction.aggregate([
-          {
-            $lookup: {
-              from: "accounts",
-              localField: "accountId",
-              foreignField: "_id",
-              as: "account",
-            },
-          },
-          {
-            $unwind: "$account",
-          },
-          {
-            $match: {
-              date: { $gte: startDate, $lte: endDate },
-              "account.type": "expense",
-              type: "debit",
-            },
-          },
-          {
-            $group: {
-              _id: null,
-              total: { $sum: "$amount" },
-            },
-          },
-        ]),
+    // Get expense accounts
+    const expenseAccounts = await Account.find({ type: "expense" }).select("_id").lean()
+    const expenseAccountIds = expenseAccounts.map((acc) => acc._id)
 
-        // Previous period revenue
-        Transaction.aggregate([
-          {
-            $lookup: {
-              from: "accounts",
-              localField: "accountId",
-              foreignField: "_id",
-              as: "account",
-            },
-          },
-          {
-            $unwind: "$account",
-          },
-          {
-            $match: {
-              date: { $gte: prevStartDate, $lte: prevEndDate },
-              "account.type": "revenue",
-              type: "credit",
-            },
-          },
-          {
-            $group: {
-              _id: null,
-              total: { $sum: "$amount" },
-            },
-          },
-        ]),
+    // Get cash accounts for cash flow
+    const cashAccounts = await Account.find({
+      $or: [{ name: { $regex: /cash/i } }, { name: { $regex: /bank/i } }],
+    })
+      .select("_id balance")
+      .lean()
 
-        // Previous period expenses
-        Transaction.aggregate([
-          {
-            $lookup: {
-              from: "accounts",
-              localField: "accountId",
-              foreignField: "_id",
-              as: "account",
-            },
+    // Current period calculations
+    const [currentRevenue, currentExpenses, prevRevenue, prevExpenses, recentTransactions] = await Promise.all([
+      // Current period revenue
+      Transaction.aggregate([
+        {
+          $match: {
+            accountId: { $in: revenueAccountIds },
+            date: { $gte: startDate, $lte: endDate },
+            status: "posted",
           },
-          {
-            $unwind: "$account",
-          },
-          {
-            $match: {
-              date: { $gte: prevStartDate, $lte: prevEndDate },
-              "account.type": "expense",
-              type: "debit",
-            },
-          },
-          {
-            $group: {
-              _id: null,
-              total: { $sum: "$amount" },
-            },
-          },
-        ]),
-
-        // Cash flow (current cash and bank balances)
-        Account.aggregate([
-          {
-            $match: {
-              type: "asset",
-              category: { $in: ["cash", "bank"] },
-              isActive: true,
-            },
-          },
-          {
-            $group: {
-              _id: null,
-              total: { $sum: "$balance" },
-            },
-          },
-        ]),
-
-        // Recent activity (last 7 days)
-        Transaction.aggregate([
-          {
-            $match: {
-              date: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
-            },
-          },
-          {
-            $lookup: {
-              from: "accounts",
-              localField: "accountId",
-              foreignField: "_id",
-              as: "account",
-            },
-          },
-          {
-            $unwind: "$account",
-          },
-          {
-            $sort: { date: -1 },
-          },
-          {
-            $limit: 10,
-          },
-          {
-            $project: {
-              date: 1,
-              description: 1,
-              reference: 1,
-              amount: 1,
-              type: 1,
-              account: {
-                name: 1,
-                type: 1,
+        },
+        {
+          $group: {
+            _id: null,
+            total: {
+              $sum: {
+                $cond: [{ $eq: ["$type", "credit"] }, "$amount", { $multiply: ["$amount", -1] }],
               },
             },
           },
-        ]),
-      ])
+        },
+      ]),
+
+      // Current period expenses
+      Expense.aggregate([
+        {
+          $match: {
+            date: { $gte: startDate, $lte: endDate },
+            status: "paid",
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: "$amount" },
+          },
+        },
+      ]),
+
+      // Previous period revenue
+      Transaction.aggregate([
+        {
+          $match: {
+            accountId: { $in: revenueAccountIds },
+            date: { $gte: prevStartDate, $lte: prevEndDate },
+            status: "posted",
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            total: {
+              $sum: {
+                $cond: [{ $eq: ["$type", "credit"] }, "$amount", { $multiply: ["$amount", -1] }],
+              },
+            },
+          },
+        },
+      ]),
+
+      // Previous period expenses
+      Expense.aggregate([
+        {
+          $match: {
+            date: { $gte: prevStartDate, $lte: prevEndDate },
+            status: "paid",
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: "$amount" },
+          },
+        },
+      ]),
+
+      // Recent transactions (last 7 days)
+      Transaction.find({
+        date: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+        status: "posted",
+      })
+        .populate("accountId", "name type")
+        .sort({ date: -1 })
+        .limit(10)
+        .lean(),
+    ])
 
     // Calculate metrics
     const revenue = currentRevenue[0]?.total || 0
     const expenses = currentExpenses[0]?.total || 0
     const profit = revenue - expenses
-    const cash = cashFlow[0]?.total || 0
+    const cashFlow = cashAccounts.reduce((sum, acc) => sum + acc.balance, 0)
 
-    const prevRevenue = previousRevenue[0]?.total || 0
-    const prevExpenses = previousExpenses[0]?.total || 0
-    const prevProfit = prevRevenue - prevExpenses
+    const prevRevenueTotal = prevRevenue[0]?.total || 0
+    const prevExpensesTotal = prevExpenses[0]?.total || 0
+    const prevProfit = prevRevenueTotal - prevExpensesTotal
 
     // Calculate growth percentages
-    const revenueGrowth = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : 0
-    const expenseGrowth = prevExpenses > 0 ? ((expenses - prevExpenses) / prevExpenses) * 100 : 0
+    const revenueGrowth = prevRevenueTotal > 0 ? ((revenue - prevRevenueTotal) / prevRevenueTotal) * 100 : 0
+    const expenseGrowth = prevExpensesTotal > 0 ? ((expenses - prevExpensesTotal) / prevExpensesTotal) * 100 : 0
     const profitGrowth = prevProfit !== 0 ? ((profit - prevProfit) / Math.abs(prevProfit)) * 100 : 0
 
     return NextResponse.json({
       metrics: {
         revenue: {
           current: revenue,
-          previous: prevRevenue,
+          previous: prevRevenueTotal,
           growth: revenueGrowth,
         },
         expenses: {
           current: expenses,
-          previous: prevExpenses,
+          previous: prevExpensesTotal,
           growth: expenseGrowth,
         },
         profit: {
@@ -237,15 +170,26 @@ export async function GET(request: NextRequest) {
           growth: profitGrowth,
         },
         cashFlow: {
-          current: cash,
-          growth: 0, // Cash flow growth would need historical data
+          current: cashFlow,
+          accounts: cashAccounts.length,
         },
       },
-      recentActivity,
+      recentActivity: recentTransactions.map((transaction) => ({
+        id: transaction._id,
+        description: transaction.description,
+        amount: transaction.amount,
+        type: transaction.type,
+        date: transaction.date,
+        account: transaction.accountId?.name || "Unknown",
+        accountType: transaction.accountId?.type || "unknown",
+        reference: transaction.reference,
+      })),
       period: {
         type: period,
         startDate,
         endDate,
+        year,
+        month: period === "monthly" ? month : undefined,
       },
     })
   } catch (error) {

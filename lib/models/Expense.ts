@@ -1,49 +1,53 @@
 import mongoose from "mongoose"
 
-const ExpenseSchema = new mongoose.Schema(
+const expenseSchema = new mongoose.Schema(
   {
-    date: {
-      type: Date,
-      required: true,
-      default: Date.now,
-    },
-    vendor: {
-      type: String,
-      required: true,
-      trim: true,
-    },
     description: {
       type: String,
       required: true,
       trim: true,
-    },
-    categoryId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "TransactionCategory",
-      required: true,
     },
     amount: {
       type: Number,
       required: true,
       min: 0,
     },
-    paymentMethod: {
-      type: String,
-      enum: ["cash", "bank_transfer", "cheque", "card"],
+    categoryId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "TransactionCategory",
       required: true,
     },
-    reference: {
+    vendor: {
       type: String,
+      required: true,
       trim: true,
     },
-    receipt: {
-      type: String,
-      trim: true,
+    date: {
+      type: Date,
+      required: true,
+    },
+    dueDate: {
+      type: Date,
     },
     status: {
       type: String,
       enum: ["pending", "approved", "paid", "rejected"],
       default: "pending",
+    },
+    paymentMethod: {
+      type: String,
+      enum: ["cash", "check", "credit_card", "bank_transfer", "other"],
+    },
+    reference: {
+      type: String,
+      trim: true,
+    },
+    receiptUrl: {
+      type: String,
+    },
+    notes: {
+      type: String,
+      trim: true,
     },
     approvedBy: {
       type: String,
@@ -55,24 +59,17 @@ const ExpenseSchema = new mongoose.Schema(
     paidAt: {
       type: Date,
     },
-    notes: {
-      type: String,
-      trim: true,
-    },
-    createdBy: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+    tags: [String],
   },
   {
     timestamps: true,
   },
 )
 
-ExpenseSchema.index({ date: -1 })
-ExpenseSchema.index({ vendor: 1 })
-ExpenseSchema.index({ status: 1 })
-ExpenseSchema.index({ categoryId: 1 })
+expenseSchema.index({ status: 1 })
+expenseSchema.index({ date: -1 })
+expenseSchema.index({ vendor: 1 })
+expenseSchema.index({ categoryId: 1 })
+expenseSchema.index({ dueDate: 1 })
 
-export default mongoose.models.Expense || mongoose.model("Expense", ExpenseSchema)
+export default mongoose.models.Expense || mongoose.model("Expense", expenseSchema)

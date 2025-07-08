@@ -7,147 +7,129 @@ export async function GET(request: NextRequest) {
     await connectDB()
 
     const { searchParams } = new URL(request.url)
-    const year = Number.parseInt(searchParams.get("year") || new Date().getFullYear().toString())
-    const month = searchParams.get("month") ? Number.parseInt(searchParams.get("month")!) : null
+    const startDate = searchParams.get("startDate")
+    const endDate = searchParams.get("endDate")
 
     // Build date filter
-    const startDate = month ? new Date(year, month - 1, 1) : new Date(year, 0, 1)
-    const endDate = month ? new Date(year, month, 0) : new Date(year, 11, 31)
+    const dateFilter: any = {}
+    if (startDate || endDate) {
+      dateFilter.date = {}
+      if (startDate) dateFilter.date.$gte = new Date(startDate)
+      if (endDate) dateFilter.date.$lte = new Date(endDate)
+    }
 
-    const [totalExpenses, pendingExpenses, approvedExpenses, paidExpenses, expensesByCategory, monthlyExpenses] =
-      await Promise.all([
-        // Total expenses
-        Expense.aggregate([
-          {
-            $match: {
-              date: { $gte: startDate, $lte: endDate },
-              status: { $in: ["approved", "paid"] },
-            },
+    // Get expense statistics
+    const [totalStats, statusStats, categoryStats, monthlyStats] = await Promise.all([
+      // Total expenses by status
+      Expense.aggregate([
+        { $match: dateFilter },
+        {
+          $group: {
+            _id: "$status",
+            count: { $sum: 1 },
+            total: { $sum: "$amount" },
           },
-          {
-            $group: {
-              _id: null,
-              total: { $sum: "$amount" },
-              count: { $sum: 1 },
-            },
-          },
-        ]),
+        },
+      ]),
 
-        // Pending expenses
-        Expense.aggregate([
-          {
-            $match: {
-              date: { $gte: startDate, $lte: endDate },
-              status: "pending",
-            },
+      // Status breakdown
+      Expense.aggregate([
+        { $match: dateFilter },
+        {
+          $group: {
+            _id: null,
+            pending: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] } },
+            approved: { $sum: { $cond: [{ $eq: ["$status", "approved"] }, 1, 0] } },
+            paid: { $sum: { $cond: [{ $eq: ["$status", "paid"] }, 1, 0] } },
+            rejected: { $sum: { $cond: [{ $eq: ["$status", "rejected"] }, 1, 0] } },
+            totalAmount: { $sum: "$amount" },
+            paidAmount: { $sum: { $cond: [{ $eq: ["$status", "paid"] }, "$amount", 0] } },
           },
-          {
-            $group: {
-              _id: null,
-              total: { $sum: "$amount" },
-              count: { $sum: 1 },
-            },
-          },
-        ]),
+        },
+      ]),
 
-        // Approved expenses
-        Expense.aggregate([
-          {
-            $match: {
-              date: { $gte: startDate, $lte: endDate },
-              status: "approved",
-            },
+      // Category breakdown
+      Expense.aggregate([
+        { $match: dateFilter },
+        {
+          $lookup: {
+            from: "transactioncategories",
+            localField: "categoryId",
+            foreignField: "_id",
+            as: "category",
           },
-          {
-            $group: {
-              _id: null,
-              total: { $sum: "$amount" },
-              count: { $sum: 1 },
-            },
+        },
+        { $unwind: "$category" },
+        {
+          $group: {
+            _id: "$categoryId",
+            name: { $first: "$category.name" },
+            color: { $first: "$category.color" },
+            count: { $sum: 1 },
+            total: { $sum: "$amount" },
           },
-        ]),
+        },
+        { $sort: { total: -1 } },
+      ]),
 
-        // Paid expenses
-        Expense.aggregate([
-          {
-            $match: {
-              date: { $gte: startDate, $lte: endDate },
-              status: "paid",
+      // Monthly trend
+      Expense.aggregate([
+        { $match: dateFilter },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$date" },
+              month: { $month: "$date" },
             },
+            count: { $sum: 1 },
+            total: { $sum: "$amount" },
           },
-          {
-            $group: {
-              _id: null,
-              total: { $sum: "$amount" },
-              count: { $sum: 1 },
-            },
-          },
-        ]),
+        },
+        { $sort: { "_id.year": 1, "_id.month": 1 } },
+      ]),
+    ])
 
-        // Expenses by category
-        Expense.aggregate([
-          {
-            $match: {
-              date: { $gte: startDate, $lte: endDate },
-              status: { $in: ["approved", "paid"] },
-            },
-          },
-          {
-            $lookup: {
-              from: "transactioncategories",
-              localField: "categoryId",
-              foreignField: "_id",
-              as: "category",
-            },
-          },
-          {
-            $unwind: "$category",
-          },
-          {
-            $group: {
-              _id: "$categoryId",
-              name: { $first: "$category.name" },
-              color: { $first: "$category.color" },
-              total: { $sum: "$amount" },
-              count: { $sum: 1 },
-            },
-          },
-          {
-            $sort: { total: -1 },
-          },
-        ]),
+    // Calculate summary
+    const summary = {
+      totalExpenses: 0,
+      paidExpenses: 0,
+      pendingExpenses: 0,
+      approvedExpenses: 0,
+      rejectedExpenses: 0,
+      totalAmount: 0,
+      paidAmount: 0,
+      pendingAmount: 0,
+    }
 
-        // Monthly expenses (for trend)
-        Expense.aggregate([
-          {
-            $match: {
-              date: { $gte: new Date(year, 0, 1), $lte: new Date(year, 11, 31) },
-              status: { $in: ["approved", "paid"] },
-            },
-          },
-          {
-            $group: {
-              _id: { $month: "$date" },
-              total: { $sum: "$amount" },
-              count: { $sum: 1 },
-            },
-          },
-          {
-            $sort: { _id: 1 },
-          },
-        ]),
-      ])
+    totalStats.forEach((stat) => {
+      switch (stat._id) {
+        case "pending":
+          summary.pendingExpenses = stat.count
+          summary.pendingAmount = stat.total
+          break
+        case "approved":
+          summary.approvedExpenses = stat.count
+          break
+        case "paid":
+          summary.paidExpenses = stat.count
+          summary.paidAmount = stat.total
+          break
+        case "rejected":
+          summary.rejectedExpenses = stat.count
+          break
+      }
+      summary.totalExpenses += stat.count
+      summary.totalAmount += stat.total
+    })
 
     return NextResponse.json({
-      total: totalExpenses[0] || { total: 0, count: 0 },
-      pending: pendingExpenses[0] || { total: 0, count: 0 },
-      approved: approvedExpenses[0] || { total: 0, count: 0 },
-      paid: paidExpenses[0] || { total: 0, count: 0 },
-      byCategory: expensesByCategory,
-      monthly: monthlyExpenses,
+      summary,
+      statusBreakdown: statusStats[0] || {},
+      categoryBreakdown: categoryStats,
+      monthlyTrend: monthlyStats,
     })
   } catch (error) {
     console.error("Error fetching expense stats:", error)
-    return NextResponse.json({ error: "Failed to fetch expense stats" }, { status: 500 })
+    return NextResponse.json({ error: "Failed to fetch expense statistics" }, { status: 500 })
   }
 }

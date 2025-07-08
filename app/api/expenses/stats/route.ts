@@ -18,55 +18,50 @@ export async function GET(request: NextRequest) {
       if (endDate) dateFilter.date.$lte = new Date(endDate)
     }
 
-    // Get expense statistics
     const [totalStats, statusStats, categoryStats, monthlyStats] = await Promise.all([
-      // Total expenses by status
-      Expense.aggregate([
-        { $match: dateFilter },
-        {
-          $group: {
-            _id: "$status",
-            count: { $sum: 1 },
-            total: { $sum: "$amount" },
-          },
-        },
-      ]),
-
-      // Status breakdown
+      // Total expenses
       Expense.aggregate([
         { $match: dateFilter },
         {
           $group: {
             _id: null,
-            pending: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] } },
-            approved: { $sum: { $cond: [{ $eq: ["$status", "approved"] }, 1, 0] } },
-            paid: { $sum: { $cond: [{ $eq: ["$status", "paid"] }, 1, 0] } },
-            rejected: { $sum: { $cond: [{ $eq: ["$status", "rejected"] }, 1, 0] } },
             totalAmount: { $sum: "$amount" },
-            paidAmount: { $sum: { $cond: [{ $eq: ["$status", "paid"] }, "$amount", 0] } },
+            count: { $sum: 1 },
+            avgAmount: { $avg: "$amount" },
           },
         },
       ]),
 
-      // Category breakdown
+      // By status
+      Expense.aggregate([
+        { $match: dateFilter },
+        {
+          $group: {
+            _id: "$status",
+            total: { $sum: "$amount" },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+
+      // By category
       Expense.aggregate([
         { $match: dateFilter },
         {
           $lookup: {
             from: "transactioncategories",
-            localField: "categoryId",
+            localField: "category",
             foreignField: "_id",
-            as: "category",
+            as: "categoryInfo",
           },
         },
-        { $unwind: "$category" },
+        { $unwind: "$categoryInfo" },
         {
           $group: {
-            _id: "$categoryId",
-            name: { $first: "$category.name" },
-            color: { $first: "$category.color" },
-            count: { $sum: 1 },
+            _id: "$category",
+            name: { $first: "$categoryInfo.name" },
             total: { $sum: "$amount" },
+            count: { $sum: 1 },
           },
         },
         { $sort: { total: -1 } },
@@ -81,51 +76,18 @@ export async function GET(request: NextRequest) {
               year: { $year: "$date" },
               month: { $month: "$date" },
             },
-            count: { $sum: 1 },
             total: { $sum: "$amount" },
+            count: { $sum: 1 },
           },
         },
         { $sort: { "_id.year": 1, "_id.month": 1 } },
       ]),
     ])
 
-    // Calculate summary
-    const summary = {
-      totalExpenses: 0,
-      paidExpenses: 0,
-      pendingExpenses: 0,
-      approvedExpenses: 0,
-      rejectedExpenses: 0,
-      totalAmount: 0,
-      paidAmount: 0,
-      pendingAmount: 0,
-    }
-
-    totalStats.forEach((stat) => {
-      switch (stat._id) {
-        case "pending":
-          summary.pendingExpenses = stat.count
-          summary.pendingAmount = stat.total
-          break
-        case "approved":
-          summary.approvedExpenses = stat.count
-          break
-        case "paid":
-          summary.paidExpenses = stat.count
-          summary.paidAmount = stat.total
-          break
-        case "rejected":
-          summary.rejectedExpenses = stat.count
-          break
-      }
-      summary.totalExpenses += stat.count
-      summary.totalAmount += stat.total
-    })
-
     return NextResponse.json({
-      summary,
-      statusBreakdown: statusStats[0] || {},
-      categoryBreakdown: categoryStats,
+      total: totalStats[0] || { totalAmount: 0, count: 0, avgAmount: 0 },
+      byStatus: statusStats,
+      byCategory: categoryStats,
       monthlyTrend: monthlyStats,
     })
   } catch (error) {

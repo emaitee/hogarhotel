@@ -5,7 +5,10 @@ import { useState, useEffect } from "react"
 interface TaxRecord {
   _id: string
   taxType: string
-  period: string
+  period: {
+    startDate: string
+    endDate: string
+  }
   taxableAmount: number
   taxRate: number
   taxAmount: number
@@ -15,8 +18,6 @@ interface TaxRecord {
   paidDate?: string
   reference?: string
   notes?: string
-  createdBy: string
-  filedBy?: string
   createdAt: string
   updatedAt: string
 }

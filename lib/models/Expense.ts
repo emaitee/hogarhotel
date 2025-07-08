@@ -12,19 +12,34 @@ const expenseSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
-    categoryId: {
+    category: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "TransactionCategory",
       required: true,
     },
     vendor: {
-      type: String,
-      required: true,
-      trim: true,
+      name: {
+        type: String,
+        required: true,
+        trim: true,
+      },
+      email: {
+        type: String,
+        trim: true,
+      },
+      phone: {
+        type: String,
+        trim: true,
+      },
+      address: {
+        type: String,
+        trim: true,
+      },
     },
     date: {
       type: Date,
       required: true,
+      default: Date.now,
     },
     dueDate: {
       type: Date,
@@ -36,19 +51,24 @@ const expenseSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ["cash", "check", "credit_card", "bank_transfer", "other"],
+      enum: ["cash", "check", "bank_transfer", "credit_card", "other"],
     },
     reference: {
       type: String,
       trim: true,
     },
-    receiptUrl: {
-      type: String,
-    },
     notes: {
       type: String,
       trim: true,
     },
+    attachments: [
+      {
+        name: String,
+        url: String,
+        type: String,
+        uploadedAt: { type: Date, default: Date.now },
+      },
+    ],
     approvedBy: {
       type: String,
       trim: true,
@@ -59,6 +79,11 @@ const expenseSchema = new mongoose.Schema(
     paidAt: {
       type: Date,
     },
+    createdBy: {
+      type: String,
+      required: true,
+      trim: true,
+    },
     tags: [String],
   },
   {
@@ -67,9 +92,9 @@ const expenseSchema = new mongoose.Schema(
 )
 
 expenseSchema.index({ status: 1 })
-expenseSchema.index({ date: -1 })
-expenseSchema.index({ vendor: 1 })
-expenseSchema.index({ categoryId: 1 })
-expenseSchema.index({ dueDate: 1 })
+expenseSchema.index({ date: 1 })
+expenseSchema.index({ category: 1 })
+expenseSchema.index({ "vendor.name": 1 })
+expenseSchema.index({ createdBy: 1 })
 
 export default mongoose.models.Expense || mongoose.model("Expense", expenseSchema)

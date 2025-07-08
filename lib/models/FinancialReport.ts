@@ -1,6 +1,6 @@
 import mongoose from "mongoose"
 
-const FinancialReportSchema = new mongoose.Schema(
+const financialReportSchema = new mongoose.Schema(
   {
     name: {
       type: String,
@@ -9,7 +9,7 @@ const FinancialReportSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["balance_sheet", "income_statement", "cash_flow", "trial_balance"],
+      enum: ["profit_loss", "balance_sheet", "cash_flow", "revenue_analysis", "expense_analysis"],
       required: true,
     },
     period: {
@@ -26,19 +26,34 @@ const FinancialReportSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       required: true,
     },
-    generatedAt: {
-      type: Date,
-      default: Date.now,
+    summary: {
+      totalRevenue: { type: Number, default: 0 },
+      totalExpenses: { type: Number, default: 0 },
+      netProfit: { type: Number, default: 0 },
+      profitMargin: { type: Number, default: 0 },
+    },
+    status: {
+      type: String,
+      enum: ["generating", "completed", "failed"],
+      default: "generating",
     },
     generatedBy: {
       type: String,
       required: true,
       trim: true,
     },
-    status: {
+    format: {
       type: String,
-      enum: ["draft", "final"],
-      default: "final",
+      enum: ["json", "pdf", "excel"],
+      default: "json",
+    },
+    fileUrl: {
+      type: String,
+      trim: true,
+    },
+    notes: {
+      type: String,
+      trim: true,
     },
   },
   {
@@ -46,8 +61,9 @@ const FinancialReportSchema = new mongoose.Schema(
   },
 )
 
-FinancialReportSchema.index({ type: 1 })
-FinancialReportSchema.index({ generatedAt: -1 })
-FinancialReportSchema.index({ "period.startDate": 1, "period.endDate": 1 })
+financialReportSchema.index({ type: 1 })
+financialReportSchema.index({ status: 1 })
+financialReportSchema.index({ "period.startDate": 1, "period.endDate": 1 })
+financialReportSchema.index({ generatedBy: 1 })
 
-export default mongoose.models.FinancialReport || mongoose.model("FinancialReport", FinancialReportSchema)
+export default mongoose.models.FinancialReport || mongoose.model("FinancialReport", financialReportSchema)

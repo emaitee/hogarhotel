@@ -1,7 +1,7 @@
 import mongoose from "mongoose"
 
 const budgetItemSchema = new mongoose.Schema({
-  categoryId: {
+  category: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "TransactionCategory",
     required: true,
@@ -14,6 +14,7 @@ const budgetItemSchema = new mongoose.Schema({
   actualAmount: {
     type: Number,
     default: 0,
+    min: 0,
   },
   variance: {
     type: Number,
@@ -37,17 +38,24 @@ const budgetSchema = new mongoose.Schema(
       trim: true,
     },
     period: {
+      startDate: {
+        type: Date,
+        required: true,
+      },
+      endDate: {
+        type: Date,
+        required: true,
+      },
+    },
+    type: {
       type: String,
-      enum: ["monthly", "quarterly", "yearly"],
+      enum: ["annual", "quarterly", "monthly", "project"],
       required: true,
     },
-    startDate: {
-      type: Date,
-      required: true,
-    },
-    endDate: {
-      type: Date,
-      required: true,
+    status: {
+      type: String,
+      enum: ["draft", "active", "completed", "archived"],
+      default: "draft",
     },
     totalBudget: {
       type: Number,
@@ -57,15 +65,11 @@ const budgetSchema = new mongoose.Schema(
     totalActual: {
       type: Number,
       default: 0,
+      min: 0,
     },
     totalVariance: {
       type: Number,
       default: 0,
-    },
-    status: {
-      type: String,
-      enum: ["draft", "active", "completed", "archived"],
-      default: "draft",
     },
     items: [budgetItemSchema],
     createdBy: {
@@ -80,15 +84,27 @@ const budgetSchema = new mongoose.Schema(
     approvedAt: {
       type: Date,
     },
+    notes: {
+      type: String,
+      trim: true,
+    },
   },
   {
     timestamps: true,
   },
 )
 
-budgetSchema.index({ period: 1 })
 budgetSchema.index({ status: 1 })
-budgetSchema.index({ startDate: 1, endDate: 1 })
+budgetSchema.index({ type: 1 })
+budgetSchema.index({ "period.startDate": 1, "period.endDate": 1 })
 budgetSchema.index({ createdBy: 1 })
+
+// Pre-save middleware to calculate totals
+budgetSchema.pre("save", function (next) {
+  this.totalBudget = this.items.reduce((sum, item) => sum + item.budgetedAmount, 0)
+  this.totalActual = this.items.reduce((sum, item) => sum + item.actualAmount, 0)
+  this.totalVariance = this.totalActual - this.totalBudget
+  next()
+})
 
 export default mongoose.models.Budget || mongoose.model("Budget", budgetSchema)

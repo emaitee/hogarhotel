@@ -28,13 +28,18 @@ const transactionCategorySchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "TransactionCategory",
     },
+    code: {
+      type: String,
+      trim: true,
+      unique: true,
+    },
   },
   {
     timestamps: true,
   },
 )
 
-transactionCategorySchema.index({ name: 1, type: 1 }, { unique: true })
+transactionCategorySchema.index({ name: 1 })
 transactionCategorySchema.index({ type: 1 })
 transactionCategorySchema.index({ isActive: 1 })
 

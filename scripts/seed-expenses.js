@@ -3,16 +3,16 @@ const { MongoClient, ObjectId } = require("mongodb")
 const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/hotel-management"
 
 const vendors = [
-  "ABC Electric Company",
-  "City Water Department",
-  "Metro Gas Services",
-  "Office Supply Plus",
-  "Professional Cleaning Co",
-  "Security Systems Inc",
-  "Maintenance Masters",
-  "Food Distributors LLC",
-  "Linen Supply Co",
-  "Tech Solutions Inc",
+  { name: "ABC Electric Company", email: "billing@abcelectric.com", phone: "+1-555-0101" },
+  { name: "City Water Department", email: "accounts@citywater.com", phone: "+1-555-0102" },
+  { name: "Metro Gas Services", email: "service@metrogas.com", phone: "+1-555-0103" },
+  { name: "Office Supply Plus", email: "orders@officesupplies.com", phone: "+1-555-0104" },
+  { name: "Professional Cleaning Co", email: "info@profcleaning.com", phone: "+1-555-0105" },
+  { name: "Security Systems Inc", email: "contact@securitysys.com", phone: "+1-555-0106" },
+  { name: "Maintenance Masters", email: "service@maintenancemasters.com", phone: "+1-555-0107" },
+  { name: "Food Distributors LLC", email: "orders@fooddistributors.com", phone: "+1-555-0108" },
+  { name: "Linen Supply Co", email: "info@linensupply.com", phone: "+1-555-0109" },
+  { name: "Tech Solutions Inc", email: "service@techsolutions.com", phone: "+1-555-0110" },
 ]
 
 const paymentMethods = ["cash", "check", "credit_card", "bank_transfer"]
@@ -52,7 +52,7 @@ async function seedAccountingData() {
     const sampleExpenses = [
       {
         date: new Date("2024-01-15"),
-        vendor: "Office Supplies Co.",
+        vendor: vendors.find((v) => v.name === "Office Supply Plus"),
         description: "Office stationery and supplies",
         amount: 25000,
         paymentMethod: "bank_transfer",
@@ -64,7 +64,7 @@ async function seedAccountingData() {
       },
       {
         date: new Date("2024-01-20"),
-        vendor: "Utility Company",
+        vendor: vendors.find((v) => v.name === "ABC Electric Company"),
         description: "Electricity bill for January",
         amount: 150000,
         paymentMethod: "bank_transfer",
@@ -77,7 +77,7 @@ async function seedAccountingData() {
       },
       {
         date: new Date("2024-01-25"),
-        vendor: "Cleaning Services Ltd",
+        vendor: vendors.find((v) => v.name === "Professional Cleaning Co"),
         description: "Professional cleaning services",
         amount: 75000,
         paymentMethod: "cash",
@@ -88,7 +88,7 @@ async function seedAccountingData() {
       },
       {
         date: new Date("2024-02-01"),
-        vendor: "Food Supplier Inc",
+        vendor: vendors.find((v) => v.name === "Food Distributors LLC"),
         description: "Restaurant ingredients and supplies",
         amount: 200000,
         paymentMethod: "bank_transfer",
@@ -100,10 +100,10 @@ async function seedAccountingData() {
       },
       {
         date: new Date("2024-02-05"),
-        vendor: "Maintenance Co",
+        vendor: vendors.find((v) => v.name === "Maintenance Masters"),
         description: "HVAC system maintenance",
         amount: 120000,
-        paymentMethod: "cheque",
+        paymentMethod: "check",
         reference: "MAINT-2024-001",
         status: "approved",
         notes: "Quarterly HVAC maintenance",
@@ -222,12 +222,12 @@ async function seedAccountingData() {
       const category = expenseCategories[Math.floor(Math.random() * expenseCategories.length)]
       const vendor = vendors[Math.floor(Math.random() * vendors.length)]
       const date = getRandomDate(startDate, endDate)
-      const dueDate = new Date(date.getTime() + (Math.random() * 30 + 7) * 24 * 60 * 60 * 1000) // 7-37 days after expense date
+      const dueDate = new Date(date.getTime() + 30 * 24 * 60 * 60 * 1000) // 30 days after expense date
       const status = statuses[Math.floor(Math.random() * statuses.length)]
       const amount = getRandomAmount(50, 5000)
 
       const expense = {
-        description: `${category.name} - ${vendor}`,
+        description: `${category.name} - ${vendor.name}`,
         amount,
         categoryId: category._id,
         vendor,
@@ -245,11 +245,11 @@ async function seedAccountingData() {
       // Add approval/payment dates based on status
       if (status === "approved" || status === "paid") {
         expense.approvedBy = "admin"
-        expense.approvedAt = new Date(date.getTime() + Math.random() * 7 * 24 * 60 * 60 * 1000)
+        expense.approvedAt = new Date(date.getTime() + 2 * 24 * 60 * 60 * 1000) // 2 days later
       }
 
       if (status === "paid") {
-        expense.paidAt = new Date(expense.approvedAt.getTime() + Math.random() * 14 * 24 * 60 * 60 * 1000)
+        expense.paidAt = new Date(expense.approvedAt.getTime() + 5 * 24 * 60 * 60 * 1000) // 5 days later
       }
 
       expenses.push(expense)

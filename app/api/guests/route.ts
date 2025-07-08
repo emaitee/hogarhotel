@@ -5,7 +5,7 @@ import type { Guest, CreateGuestData } from "@/lib/models/Guest"
 export async function GET() {
   try {
     const { db } = await connectToDatabase()
-    const guests = await db.collection<Guest>("guests").find({}).toArray()
+    const guests = await db.collection<Guest>("guests").find({}).sort({ createdAt: -1 }).toArray()
 
     return NextResponse.json(guests)
   } catch (error) {
@@ -19,17 +19,25 @@ export async function POST(request: NextRequest) {
     const { db } = await connectToDatabase()
     const data: CreateGuestData = await request.json()
 
-    // Check if guest with email or ID number already exists
+    // Check if guest with email already exists
     const existingGuest = await db.collection<Guest>("guests").findOne({
-      $or: [{ email: data.email }, { idNumber: data.idNumber }],
+      email: data.email,
     })
 
     if (existingGuest) {
-      return NextResponse.json({ error: "Guest with this email or ID number already exists" }, { status: 400 })
+      return NextResponse.json({ error: "Guest with this email already exists" }, { status: 400 })
     }
 
     const guest: Omit<Guest, "_id"> = {
-      ...data,
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+      address: data.address,
+      nationality: data.nationality,
+      dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
+      idNumber: data.idNumber,
+      emergencyContact: data.emergencyContact,
+      specialRequests: data.specialRequests,
       totalStays: 0,
       totalSpent: 0,
       createdAt: new Date(),

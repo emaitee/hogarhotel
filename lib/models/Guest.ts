@@ -6,7 +6,11 @@ export interface Guest {
   email: string
   phone: string
   address: string
+  nationality?: string
+  dateOfBirth?: Date
   idNumber: string
+  emergencyContact?: string
+  specialRequests?: string
   totalStays: number
   totalSpent: number
   createdAt: Date
@@ -18,7 +22,11 @@ export interface CreateGuestData {
   email: string
   phone: string
   address: string
+  nationality?: string
+  dateOfBirth?: string
   idNumber: string
+  emergencyContact?: string
+  specialRequests?: string
 }
 
 export interface UpdateGuestData {
@@ -26,5 +34,9 @@ export interface UpdateGuestData {
   email?: string
   phone?: string
   address?: string
+  nationality?: string
+  dateOfBirth?: string
   idNumber?: string
+  emergencyContact?: string
+  specialRequests?: string
 }

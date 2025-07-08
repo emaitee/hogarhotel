@@ -1,45 +1,91 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import type { ITransactionWithDetails, ITransactionCategory } from "@/lib/models/Transaction"
+import { toast } from "sonner"
+
+export interface TransactionEntry {
+  accountCode: string
+  accountName: string
+  debit: number
+  credit: number
+}
+
+export interface Transaction {
+  _id: string
+  transactionNumber: string
+  date: string
+  description: string
+  reference?: string
+  category: string
+  entries: TransactionEntry[]
+  totalAmount: number
+  status: "Draft" | "Posted" | "Cancelled"
+  createdBy: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateTransactionData {
+  date?: string
+  description: string
+  reference?: string
+  category: string
+  entries: TransactionEntry[]
+  createdBy?: string
+}
+
+export interface TransactionFilters {
+  page?: number
+  limit?: number
+  status?: string
+  category?: string
+  startDate?: string
+  endDate?: string
+}
 
 export function useTransactions() {
-  const [transactions, setTransactions] = useState<ITransactionWithDetails[]>([])
-  const [categories, setCategories] = useState<ITransactionCategory[]>([])
+  const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    pages: 0,
+  })
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = async (filters: TransactionFilters = {}) => {
     try {
       setLoading(true)
-      const response = await fetch("/api/transactions")
-      if (!response.ok) {
-        throw new Error("Failed to fetch transactions")
+      const params = new URLSearchParams()
+
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          params.append(key, value.toString())
+        }
+      })
+
+      const response = await fetch(`/api/transactions?${params.toString()}`)
+      const result = await response.json()
+
+      if (result.success) {
+        setTransactions(result.data)
+        setPagination(result.pagination)
+        setError(null)
+      } else {
+        setError(result.error || "Failed to fetch transactions")
+        toast.error(result.error || "Failed to fetch transactions")
       }
-      const data = await response.json()
-      setTransactions(data)
-      setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred")
+      const errorMessage = "Failed to fetch transactions"
+      setError(errorMessage)
+      toast.error(errorMessage)
     } finally {
       setLoading(false)
     }
   }
 
-  const fetchCategories = async () => {
-    try {
-      const response = await fetch("/api/transactions/categories")
-      if (!response.ok) {
-        throw new Error("Failed to fetch categories")
-      }
-      const data = await response.json()
-      setCategories(data)
-    } catch (err) {
-      console.error("Error fetching categories:", err)
-    }
-  }
-
-  const createTransaction = async (transactionData: any) => {
+  const createTransaction = async (transactionData: CreateTransactionData): Promise<boolean> => {
     try {
       const response = await fetch("/api/transactions", {
         method: "POST",
@@ -49,96 +95,100 @@ export function useTransactions() {
         body: JSON.stringify(transactionData),
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to create transaction")
-      }
+      const result = await response.json()
 
-      const newTransaction = await response.json()
-      await fetchTransactions() // Refetch to get updated data with relations
-      return newTransaction
+      if (result.success) {
+        setTransactions((prev) => [result.data, ...prev])
+        toast.success("Transaction created successfully")
+        return true
+      } else {
+        toast.error(result.error || "Failed to create transaction")
+        return false
+      }
     } catch (err) {
-      throw err
+      toast.error("Failed to create transaction")
+      return false
     }
   }
 
-  const updateTransaction = async (id: string, updateData: any) => {
+  const updateTransactionStatus = async (id: string, status: "Draft" | "Posted" | "Cancelled"): Promise<boolean> => {
     try {
       const response = await fetch(`/api/transactions/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(updateData),
+        body: JSON.stringify({ status }),
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to update transaction")
-      }
+      const result = await response.json()
 
-      const updatedTransaction = await response.json()
-      await fetchTransactions() // Refetch to get updated data
-      return updatedTransaction
+      if (result.success) {
+        setTransactions((prev) => prev.map((transaction) => (transaction._id === id ? result.data : transaction)))
+        toast.success("Transaction status updated successfully")
+        return true
+      } else {
+        toast.error(result.error || "Failed to update transaction")
+        return false
+      }
     } catch (err) {
-      throw err
+      toast.error("Failed to update transaction")
+      return false
     }
   }
 
-  const deleteTransaction = async (id: string) => {
+  const deleteTransaction = async (id: string): Promise<boolean> => {
     try {
       const response = await fetch(`/api/transactions/${id}`, {
         method: "DELETE",
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to delete transaction")
-      }
+      const result = await response.json()
 
-      setTransactions((prev) => prev.filter((transaction) => transaction._id?.toString() !== id))
+      if (result.success) {
+        setTransactions((prev) => prev.filter((transaction) => transaction._id !== id))
+        toast.success("Transaction deleted successfully")
+        return true
+      } else {
+        toast.error(result.error || "Failed to delete transaction")
+        return false
+      }
     } catch (err) {
-      throw err
+      toast.error("Failed to delete transaction")
+      return false
     }
   }
 
-  const createCategory = async (categoryData: Omit<ITransactionCategory, "_id">) => {
+  const fetchCategories = async (): Promise<string[]> => {
     try {
-      const response = await fetch("/api/transactions/categories", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(categoryData),
-      })
+      const response = await fetch("/api/transactions/categories")
+      const result = await response.json()
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to create category")
+      if (result.success) {
+        return result.data
+      } else {
+        toast.error("Failed to fetch categories")
+        return []
       }
-
-      const newCategory = await response.json()
-      setCategories((prev) => [...prev, newCategory])
-      return newCategory
     } catch (err) {
-      throw err
+      toast.error("Failed to fetch categories")
+      return []
     }
   }
 
   useEffect(() => {
     fetchTransactions()
-    fetchCategories()
   }, [])
 
   return {
     transactions,
-    categories,
     loading,
     error,
-    refetch: fetchTransactions,
+    pagination,
+    fetchTransactions,
     createTransaction,
-    updateTransaction,
+    updateTransactionStatus,
     deleteTransaction,
-    createCategory,
+    fetchCategories,
   }
 }

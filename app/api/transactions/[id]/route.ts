@@ -1,68 +1,109 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { connectDB } from "@/lib/mongodb"
 import { Transaction } from "@/lib/models/Transaction"
+import { Account } from "@/lib/models/Account"
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const transaction = await Transaction.findById(params.id)
+    await connectDB()
+
+    const transaction = await Transaction.findById(params.id).lean()
 
     if (!transaction) {
-      return NextResponse.json({ error: "Transaction not found" }, { status: 404 })
+      return NextResponse.json({ success: false, error: "Transaction not found" }, { status: 404 })
     }
 
-    return NextResponse.json(transaction)
+    return NextResponse.json({
+      success: true,
+      data: transaction,
+    })
   } catch (error) {
     console.error("Error fetching transaction:", error)
-    return NextResponse.json({ error: "Failed to fetch transaction" }, { status: 500 })
+    return NextResponse.json({ success: false, error: "Failed to fetch transaction" }, { status: 500 })
   }
 }
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
+    await connectDB()
+
     const body = await request.json()
+    const { status } = body
 
-    // Validate transaction type if provided
-    if (body.type && !["debit", "credit"].includes(body.type)) {
-      return NextResponse.json({ error: "Invalid transaction type. Must be debit or credit" }, { status: 400 })
-    }
-
-    // Validate amount if provided
-    if (body.amount !== undefined) {
-      const parsedAmount = Number.parseFloat(body.amount)
-      if (isNaN(parsedAmount) || parsedAmount <= 0) {
-        return NextResponse.json({ error: "Amount must be a positive number" }, { status: 400 })
-      }
-      body.amount = parsedAmount
-    }
-
-    // Convert date if provided
-    if (body.date) {
-      body.date = new Date(body.date)
-    }
-
-    const transaction = await Transaction.update(params.id, body)
-
+    const transaction = await Transaction.findById(params.id)
     if (!transaction) {
-      return NextResponse.json({ error: "Transaction not found" }, { status: 404 })
+      return NextResponse.json({ success: false, error: "Transaction not found" }, { status: 404 })
     }
 
-    return NextResponse.json(transaction)
+    // Only allow status updates for now
+    if (status && ["Draft", "Posted", "Cancelled"].includes(status)) {
+      const oldStatus = transaction.status
+      transaction.status = status
+
+      // Update account balances when posting or cancelling
+      if (oldStatus !== "Posted" && status === "Posted") {
+        // Post transaction - update balances
+        for (const entry of transaction.entries) {
+          const account = await Account.findOne({ code: entry.accountCode })
+          if (account) {
+            if (["Asset", "Expense"].includes(account.type)) {
+              account.balance += (entry.debit || 0) - (entry.credit || 0)
+            } else {
+              account.balance += (entry.credit || 0) - (entry.debit || 0)
+            }
+            await account.save()
+          }
+        }
+      } else if (oldStatus === "Posted" && status !== "Posted") {
+        // Reverse transaction - update balances
+        for (const entry of transaction.entries) {
+          const account = await Account.findOne({ code: entry.accountCode })
+          if (account) {
+            if (["Asset", "Expense"].includes(account.type)) {
+              account.balance -= (entry.debit || 0) - (entry.credit || 0)
+            } else {
+              account.balance -= (entry.credit || 0) - (entry.debit || 0)
+            }
+            await account.save()
+          }
+        }
+      }
+
+      await transaction.save()
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: transaction,
+    })
   } catch (error) {
     console.error("Error updating transaction:", error)
-    return NextResponse.json({ error: "Failed to update transaction" }, { status: 500 })
+    return NextResponse.json({ success: false, error: "Failed to update transaction" }, { status: 500 })
   }
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const success = await Transaction.delete(params.id)
+    await connectDB()
 
-    if (!success) {
-      return NextResponse.json({ error: "Transaction not found" }, { status: 404 })
+    const transaction = await Transaction.findById(params.id)
+    if (!transaction) {
+      return NextResponse.json({ success: false, error: "Transaction not found" }, { status: 404 })
     }
 
-    return NextResponse.json({ message: "Transaction deleted successfully" })
+    // Only allow deletion of draft transactions
+    if (transaction.status !== "Draft") {
+      return NextResponse.json({ success: false, error: "Only draft transactions can be deleted" }, { status: 400 })
+    }
+
+    await Transaction.findByIdAndDelete(params.id)
+
+    return NextResponse.json({
+      success: true,
+      message: "Transaction deleted successfully",
+    })
   } catch (error) {
     console.error("Error deleting transaction:", error)
-    return NextResponse.json({ error: "Failed to delete transaction" }, { status: 500 })
+    return NextResponse.json({ success: false, error: "Failed to delete transaction" }, { status: 500 })
   }
 }

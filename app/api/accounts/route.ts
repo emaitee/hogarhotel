@@ -1,53 +1,63 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { connectDB } from "@/lib/mongodb"
 import { Account } from "@/lib/models/Account"
 
 export async function GET() {
   try {
-    const accounts = await Account.findAll()
-    return NextResponse.json(accounts)
+    await connectDB()
+
+    const accounts = await Account.find({ isActive: true }).sort({ code: 1 }).lean()
+
+    return NextResponse.json({
+      success: true,
+      data: accounts,
+    })
   } catch (error) {
     console.error("Error fetching accounts:", error)
-    return NextResponse.json({ error: "Failed to fetch accounts" }, { status: 500 })
+    return NextResponse.json({ success: false, error: "Failed to fetch accounts" }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    await connectDB()
+
     const body = await request.json()
+    const { code, name, type, category, balance = 0, parentAccount, description } = body
 
     // Validate required fields
-    const { code, name, type, category, balance = 0, isActive = true } = body
-
     if (!code || !name || !type || !category) {
-      return NextResponse.json({ error: "Missing required fields: code, name, type, category" }, { status: 400 })
+      return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 })
     }
 
     // Check if account code already exists
-    const existingAccount = await Account.findByCode(code)
+    const existingAccount = await Account.findOne({ code })
     if (existingAccount) {
-      return NextResponse.json({ error: "Account code already exists" }, { status: 409 })
+      return NextResponse.json({ success: false, error: "Account code already exists" }, { status: 400 })
     }
 
-    // Validate account type
-    const validTypes = ["asset", "liability", "equity", "revenue", "expense"]
-    if (!validTypes.includes(type)) {
-      return NextResponse.json({ error: "Invalid account type" }, { status: 400 })
-    }
-
-    const account = await Account.create({
+    // Create new account
+    const account = new Account({
       code,
       name,
       type,
       category,
-      balance: Number.parseFloat(balance) || 0,
-      isActive: Boolean(isActive),
-      parentId: body.parentId,
-      description: body.description,
+      balance,
+      parentAccount,
+      description,
     })
 
-    return NextResponse.json(account, { status: 201 })
+    await account.save()
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: account,
+      },
+      { status: 201 },
+    )
   } catch (error) {
     console.error("Error creating account:", error)
-    return NextResponse.json({ error: "Failed to create account" }, { status: 500 })
+    return NextResponse.json({ success: false, error: "Failed to create account" }, { status: 500 })
   }
 }

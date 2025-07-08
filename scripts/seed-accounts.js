@@ -1,166 +1,54 @@
 const { MongoClient } = require("mongodb")
 
-const uri = process.env.MONGODB_URI || "mongodb://localhost:27017"
+const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/hotel-management"
 const dbName = "hotel_management"
 
 const defaultAccounts = [
   // Assets
-  { code: "1001", name: "Cash in Hand", type: "asset", category: "Current Assets", balance: 50000, isActive: true },
-  {
-    code: "1002",
-    name: "Bank Account - Main",
-    type: "asset",
-    category: "Current Assets",
-    balance: 500000,
-    isActive: true,
-  },
-  {
-    code: "1003",
-    name: "Accounts Receivable",
-    type: "asset",
-    category: "Current Assets",
-    balance: 75000,
-    isActive: true,
-  },
-  {
-    code: "1004",
-    name: "Inventory - Food & Beverage",
-    type: "asset",
-    category: "Current Assets",
-    balance: 25000,
-    isActive: true,
-  },
-  {
-    code: "1101",
-    name: "Furniture & Fixtures",
-    type: "asset",
-    category: "Fixed Assets",
-    balance: 200000,
-    isActive: true,
-  },
-  { code: "1102", name: "Building", type: "asset", category: "Fixed Assets", balance: 2000000, isActive: true },
-  { code: "1103", name: "Equipment", type: "asset", category: "Fixed Assets", balance: 150000, isActive: true },
+  { code: "1000", name: "Cash", type: "Asset", category: "Current Assets", balance: 50000 },
+  { code: "1010", name: "Petty Cash", type: "Asset", category: "Current Assets", balance: 1000 },
+  { code: "1100", name: "Accounts Receivable", type: "Asset", category: "Current Assets", balance: 15000 },
+  { code: "1200", name: "Inventory - Food & Beverage", type: "Asset", category: "Current Assets", balance: 8000 },
+  { code: "1210", name: "Inventory - Supplies", type: "Asset", category: "Current Assets", balance: 5000 },
+  { code: "1500", name: "Furniture & Equipment", type: "Asset", category: "Fixed Assets", balance: 200000 },
+  { code: "1510", name: "Building", type: "Asset", category: "Fixed Assets", balance: 500000 },
+  { code: "1520", name: "Land", type: "Asset", category: "Fixed Assets", balance: 300000 },
+  { code: "1600", name: "Accumulated Depreciation", type: "Asset", category: "Fixed Assets", balance: -50000 },
 
   // Liabilities
-  {
-    code: "2001",
-    name: "Accounts Payable",
-    type: "liability",
-    category: "Current Liabilities",
-    balance: 30000,
-    isActive: true,
-  },
-  {
-    code: "2002",
-    name: "Accrued Expenses",
-    type: "liability",
-    category: "Current Liabilities",
-    balance: 15000,
-    isActive: true,
-  },
-  {
-    code: "2003",
-    name: "Customer Deposits",
-    type: "liability",
-    category: "Current Liabilities",
-    balance: 25000,
-    isActive: true,
-  },
-  {
-    code: "2101",
-    name: "Long-term Loan",
-    type: "liability",
-    category: "Long-term Liabilities",
-    balance: 500000,
-    isActive: true,
-  },
+  { code: "2000", name: "Accounts Payable", type: "Liability", category: "Current Liabilities", balance: 12000 },
+  { code: "2100", name: "Accrued Expenses", type: "Liability", category: "Current Liabilities", balance: 8000 },
+  { code: "2200", name: "Customer Deposits", type: "Liability", category: "Current Liabilities", balance: 25000 },
+  { code: "2300", name: "Taxes Payable", type: "Liability", category: "Current Liabilities", balance: 5000 },
+  { code: "2500", name: "Long-term Debt", type: "Liability", category: "Long-term Liabilities", balance: 150000 },
 
   // Equity
-  {
-    code: "3001",
-    name: "Owner's Capital",
-    type: "equity",
-    category: "Owner's Equity",
-    balance: 2000000,
-    isActive: true,
-  },
-  {
-    code: "3002",
-    name: "Retained Earnings",
-    type: "equity",
-    category: "Owner's Equity",
-    balance: 465000,
-    isActive: true,
-  },
+  { code: "3000", name: "Owner's Capital", type: "Equity", category: "Owner's Equity", balance: 800000 },
+  { code: "3100", name: "Retained Earnings", type: "Equity", category: "Owner's Equity", balance: 50000 },
 
   // Revenue
-  { code: "4001", name: "Room Revenue", type: "revenue", category: "Operating Revenue", balance: 0, isActive: true },
-  {
-    code: "4002",
-    name: "Food & Beverage Revenue",
-    type: "revenue",
-    category: "Operating Revenue",
-    balance: 0,
-    isActive: true,
-  },
-  { code: "4003", name: "Laundry Revenue", type: "revenue", category: "Operating Revenue", balance: 0, isActive: true },
-  { code: "4004", name: "Other Revenue", type: "revenue", category: "Operating Revenue", balance: 0, isActive: true },
+  { code: "4000", name: "Room Revenue", type: "Revenue", category: "Operating Revenue", balance: 0 },
+  { code: "4100", name: "Food & Beverage Revenue", type: "Revenue", category: "Operating Revenue", balance: 0 },
+  { code: "4200", name: "Laundry Revenue", type: "Revenue", category: "Operating Revenue", balance: 0 },
+  { code: "4300", name: "Spa Revenue", type: "Revenue", category: "Operating Revenue", balance: 0 },
+  { code: "4400", name: "Conference Revenue", type: "Revenue", category: "Operating Revenue", balance: 0 },
+  { code: "4500", name: "Other Revenue", type: "Revenue", category: "Other Revenue", balance: 0 },
 
   // Expenses
-  { code: "5001", name: "Staff Salaries", type: "expense", category: "Operating Expenses", balance: 0, isActive: true },
-  { code: "5002", name: "Utilities", type: "expense", category: "Operating Expenses", balance: 0, isActive: true },
-  {
-    code: "5003",
-    name: "Maintenance & Repairs",
-    type: "expense",
-    category: "Operating Expenses",
-    balance: 0,
-    isActive: true,
-  },
-  {
-    code: "5004",
-    name: "Marketing & Advertising",
-    type: "expense",
-    category: "Operating Expenses",
-    balance: 0,
-    isActive: true,
-  },
-  {
-    code: "5005",
-    name: "Food & Beverage Costs",
-    type: "expense",
-    category: "Cost of Sales",
-    balance: 0,
-    isActive: true,
-  },
-  {
-    code: "5006",
-    name: "Housekeeping Supplies",
-    type: "expense",
-    category: "Operating Expenses",
-    balance: 0,
-    isActive: true,
-  },
-  {
-    code: "5007",
-    name: "Administrative Expenses",
-    type: "expense",
-    category: "Operating Expenses",
-    balance: 0,
-    isActive: true,
-  },
-]
-
-const defaultCategories = [
-  { name: "Room Operations", type: "income", color: "#10B981", description: "Revenue from room bookings" },
-  { name: "Food & Beverage", type: "income", color: "#8B5CF6", description: "Revenue from restaurant and bar" },
-  { name: "Other Services", type: "income", color: "#06B6D4", description: "Revenue from additional services" },
-  { name: "Staff Costs", type: "expense", color: "#EF4444", description: "Employee salaries and benefits" },
-  { name: "Utilities", type: "expense", color: "#F59E0B", description: "Electricity, water, gas, internet" },
-  { name: "Maintenance", type: "expense", color: "#84CC16", description: "Repairs and maintenance costs" },
-  { name: "Marketing", type: "expense", color: "#EC4899", description: "Advertising and promotional expenses" },
-  { name: "Supplies", type: "expense", color: "#6366F1", description: "Housekeeping and operational supplies" },
-  { name: "Administrative", type: "expense", color: "#64748B", description: "Office and administrative expenses" },
+  { code: "5000", name: "Cost of Goods Sold", type: "Expense", category: "Cost of Sales", balance: 0 },
+  { code: "5100", name: "Salaries & Wages", type: "Expense", category: "Operating Expenses", balance: 0 },
+  { code: "5110", name: "Employee Benefits", type: "Expense", category: "Operating Expenses", balance: 0 },
+  { code: "5200", name: "Utilities", type: "Expense", category: "Operating Expenses", balance: 0 },
+  { code: "5210", name: "Telephone", type: "Expense", category: "Operating Expenses", balance: 0 },
+  { code: "5220", name: "Internet", type: "Expense", category: "Operating Expenses", balance: 0 },
+  { code: "5300", name: "Maintenance & Repairs", type: "Expense", category: "Operating Expenses", balance: 0 },
+  { code: "5400", name: "Marketing & Advertising", type: "Expense", category: "Operating Expenses", balance: 0 },
+  { code: "5500", name: "Insurance", type: "Expense", category: "Operating Expenses", balance: 0 },
+  { code: "5600", name: "Office Supplies", type: "Expense", category: "Operating Expenses", balance: 0 },
+  { code: "5700", name: "Professional Services", type: "Expense", category: "Operating Expenses", balance: 0 },
+  { code: "5800", name: "Depreciation Expense", type: "Expense", category: "Operating Expenses", balance: 0 },
+  { code: "5900", name: "Bank Charges", type: "Expense", category: "Other Expenses", balance: 0 },
+  { code: "5910", name: "Interest Expense", type: "Expense", category: "Other Expenses", balance: 0 },
 ]
 
 async function seedAccounts() {
@@ -171,33 +59,38 @@ async function seedAccounts() {
     console.log("Connected to MongoDB")
 
     const db = client.db(dbName)
+    const accountsCollection = db.collection("accounts")
 
-    // Clear existing data
-    await db.collection("accounts").deleteMany({})
-    await db.collection("transaction_categories").deleteMany({})
+    // Clear existing accounts
+    await accountsCollection.deleteMany({})
+    console.log("Cleared existing accounts")
 
-    // Add timestamps to accounts
+    // Insert default accounts
     const accountsWithTimestamps = defaultAccounts.map((account) => ({
       ...account,
+      isActive: true,
       createdAt: new Date(),
       updatedAt: new Date(),
     }))
 
-    // Insert accounts
-    const accountResult = await db.collection("accounts").insertMany(accountsWithTimestamps)
-    console.log(`Inserted ${accountResult.insertedCount} accounts`)
+    const result = await accountsCollection.insertMany(accountsWithTimestamps)
+    console.log(`Inserted ${result.insertedCount} accounts`)
 
-    // Insert transaction categories
-    const categoryResult = await db.collection("transaction_categories").insertMany(defaultCategories)
-    console.log(`Inserted ${categoryResult.insertedCount} transaction categories`)
-
-    console.log("Accounts and categories seeded successfully!")
+    // Display summary
+    console.log("\n=== ACCOUNTS SEEDED ===")
+    console.log("Assets:", defaultAccounts.filter((a) => a.type === "Asset").length)
+    console.log("Liabilities:", defaultAccounts.filter((a) => a.type === "Liability").length)
+    console.log("Equity:", defaultAccounts.filter((a) => a.type === "Equity").length)
+    console.log("Revenue:", defaultAccounts.filter((a) => a.type === "Revenue").length)
+    console.log("Expenses:", defaultAccounts.filter((a) => a.type === "Expense").length)
+    console.log("Total:", defaultAccounts.length)
   } catch (error) {
     console.error("Error seeding accounts:", error)
   } finally {
     await client.close()
+    console.log("Disconnected from MongoDB")
   }
 }
 
 // Run the seeding function
-seedAccounts().catch(console.error)
+seedAccounts()

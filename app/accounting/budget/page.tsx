@@ -1,6 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import type React from "react"
+
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { DataTable } from "@/components/shared/DataTable"
+import { useBudgets } from "@/hooks/useBudgets"
 import { formatCurrency } from "@/lib/utils"
 import {
   Plus,
@@ -24,75 +27,13 @@ import {
   Trash2,
 } from "lucide-react"
 import Link from "next/link"
-
-interface Budget {
-  id: string
-  category: string
-  budgetAmount: number
-  actualAmount: number
-  period: string
-  status: "on-track" | "over-budget" | "under-budget"
-  variance: number
-  variancePercentage: number
-}
-
-const budgetData: Budget[] = [
-  {
-    id: "1",
-    category: "Room Operations",
-    budgetAmount: 500000,
-    actualAmount: 450000,
-    period: "2024-01",
-    status: "under-budget",
-    variance: -50000,
-    variancePercentage: -10,
-  },
-  {
-    id: "2",
-    category: "Staff Salaries",
-    budgetAmount: 800000,
-    actualAmount: 820000,
-    period: "2024-01",
-    status: "over-budget",
-    variance: 20000,
-    variancePercentage: 2.5,
-  },
-  {
-    id: "3",
-    category: "Utilities",
-    budgetAmount: 200000,
-    actualAmount: 195000,
-    period: "2024-01",
-    status: "on-track",
-    variance: -5000,
-    variancePercentage: -2.5,
-  },
-  {
-    id: "4",
-    category: "Marketing",
-    budgetAmount: 150000,
-    actualAmount: 180000,
-    period: "2024-01",
-    status: "over-budget",
-    variance: 30000,
-    variancePercentage: 20,
-  },
-  {
-    id: "5",
-    category: "Maintenance",
-    budgetAmount: 300000,
-    actualAmount: 275000,
-    period: "2024-01",
-    status: "under-budget",
-    variance: -25000,
-    variancePercentage: -8.3,
-  },
-]
+import { toast } from "sonner"
 
 const columns = [
-  { key: "category", label: "Category", sortable: true },
-  { key: "budgetAmount", label: "Budget", sortable: true },
-  { key: "actualAmount", label: "Actual", sortable: true },
+  { key: "name", label: "Budget Name", sortable: true },
+  { key: "period", label: "Period", sortable: true },
+  { key: "totalBudget", label: "Budget", sortable: true },
+  { key: "totalActual", label: "Actual", sortable: true },
   { key: "variance", label: "Variance", sortable: true },
   { key: "status", label: "Status", sortable: true },
   { key: "progress", label: "Progress", sortable: false },
@@ -101,15 +42,55 @@ const columns = [
 
 export default function BudgetManagementPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [categories, setCategories] = useState<any[]>([])
+  const { budgets, loading, error, createBudget, updateBudget, deleteBudget, fetchBudgets } = useBudgets()
 
-  const renderCell = (budget: Budget, column: any) => {
+  useEffect(() => {
+    // Fetch transaction categories
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch("/api/transactions/categories")
+        if (response.ok) {
+          const data = await response.json()
+          setCategories(data)
+        }
+      } catch (error) {
+        console.error("Error fetching categories:", error)
+      }
+    }
+
+    fetchCategories()
+  }, [])
+
+  const handleDeleteBudget = async (budgetId: string) => {
+    if (confirm("Are you sure you want to delete this budget?")) {
+      try {
+        await deleteBudget(budgetId)
+        toast.success("Budget deleted successfully")
+      } catch (error) {
+        toast.error("Failed to delete budget")
+      }
+    }
+  }
+
+  const renderCell = (budget: any, column: any) => {
     switch (column.key) {
-      case "category":
-        return <span className="font-medium">{budget.category}</span>
-      case "budgetAmount":
-        return <span className="font-medium">{formatCurrency(budget.budgetAmount)}</span>
-      case "actualAmount":
-        return <span className="font-medium">{formatCurrency(budget.actualAmount)}</span>
+      case "name":
+        return <span className="font-medium">{budget.name}</span>
+      case "period":
+        return (
+          <div>
+            <div className="font-medium">{budget.period}</div>
+            <div className="text-sm text-gray-500">
+              {budget.year}
+              {budget.month ? `-${budget.month.toString().padStart(2, "0")}` : ""}
+            </div>
+          </div>
+        )
+      case "totalBudget":
+        return <span className="font-medium">{formatCurrency(budget.totalBudget)}</span>
+      case "totalActual":
+        return <span className="font-medium">{formatCurrency(budget.totalActual)}</span>
       case "variance":
         return (
           <div className="flex items-center space-x-1">
@@ -123,27 +104,27 @@ export default function BudgetManagementPage() {
               {formatCurrency(budget.variance)}
             </span>
             <span className={`text-sm ${budget.variance > 0 ? "text-red-500" : "text-green-500"}`}>
-              ({budget.variancePercentage > 0 ? "+" : ""}
-              {budget.variancePercentage.toFixed(1)}%)
+              ({budget.totalBudget > 0 ? ((budget.variance / budget.totalBudget) * 100).toFixed(1) : 0}%)
             </span>
           </div>
         )
       case "status":
         const statusConfig = {
-          "on-track": { color: "bg-green-100 text-green-800", icon: CheckCircle },
-          "over-budget": { color: "bg-red-100 text-red-800", icon: AlertTriangle },
-          "under-budget": { color: "bg-blue-100 text-blue-800", icon: TrendingDown },
+          draft: { color: "bg-gray-100 text-gray-800", icon: Edit },
+          approved: { color: "bg-blue-100 text-blue-800", icon: CheckCircle },
+          active: { color: "bg-green-100 text-green-800", icon: CheckCircle },
+          closed: { color: "bg-red-100 text-red-800", icon: AlertTriangle },
         }
-        const config = statusConfig[budget.status]
+        const config = statusConfig[budget.status as keyof typeof statusConfig]
         const StatusIcon = config.icon
         return (
           <Badge className={config.color}>
             <StatusIcon className="h-3 w-3 mr-1" />
-            {budget.status.replace("-", " ")}
+            {budget.status}
           </Badge>
         )
       case "progress":
-        const percentage = (budget.actualAmount / budget.budgetAmount) * 100
+        const percentage = budget.totalBudget > 0 ? (budget.totalActual / budget.totalBudget) * 100 : 0
         return (
           <div className="w-full">
             <Progress value={Math.min(percentage, 100)} className="w-full" />
@@ -156,24 +137,40 @@ export default function BudgetManagementPage() {
             <Button size="sm" variant="outline">
               <Edit className="h-4 w-4" />
             </Button>
-            <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700 bg-transparent">
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-red-600 hover:text-red-700 bg-transparent"
+              onClick={() => handleDeleteBudget(budget._id)}
+            >
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
         )
       default:
-        return budget[column.key as keyof Budget]
+        return budget[column.key]
     }
   }
 
-  const totalBudget = budgetData.reduce((sum, item) => sum + item.budgetAmount, 0)
-  const totalActual = budgetData.reduce((sum, item) => sum + item.actualAmount, 0)
+  const totalBudget = budgets.reduce((sum, item) => sum + item.totalBudget, 0)
+  const totalActual = budgets.reduce((sum, item) => sum + item.totalActual, 0)
   const totalVariance = totalActual - totalBudget
-  const variancePercentage = (totalVariance / totalBudget) * 100
+  const variancePercentage = totalBudget > 0 ? (totalVariance / totalBudget) * 100 : 0
 
-  const onTrackCount = budgetData.filter((b) => b.status === "on-track").length
-  const overBudgetCount = budgetData.filter((b) => b.status === "over-budget").length
-  const underBudgetCount = budgetData.filter((b) => b.status === "under-budget").length
+  const onTrackCount = budgets.filter((b) => Math.abs(b.variance / b.totalBudget) <= 0.05).length
+  const overBudgetCount = budgets.filter((b) => b.variance > 0).length
+  const underBudgetCount = budgets.filter((b) => b.variance < 0).length
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Error: {error}</p>
+          <Button onClick={() => fetchBudgets()}>Retry</Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -201,11 +198,11 @@ export default function BudgetManagementPage() {
               Add Budget
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-4xl">
             <DialogHeader>
               <DialogTitle>Add New Budget</DialogTitle>
             </DialogHeader>
-            <AddBudgetForm onClose={() => setIsAddModalOpen(false)} />
+            <AddBudgetForm categories={categories} onClose={() => setIsAddModalOpen(false)} onSubmit={createBudget} />
           </DialogContent>
         </Dialog>
       </motion.div>
@@ -312,7 +309,13 @@ export default function BudgetManagementPage() {
             <CardTitle>Budget Overview</CardTitle>
           </CardHeader>
           <CardContent>
-            <DataTable data={budgetData} columns={columns} searchKey="category" renderCell={renderCell} />
+            {loading ? (
+              <div className="flex items-center justify-center h-32">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1B2A41]"></div>
+              </div>
+            ) : (
+              <DataTable data={budgets} columns={columns} searchKey="name" renderCell={renderCell} />
+            )}
           </CardContent>
         </Card>
       </motion.div>
@@ -320,54 +323,186 @@ export default function BudgetManagementPage() {
   )
 }
 
-function AddBudgetForm({ onClose }: { onClose: () => void }) {
+function AddBudgetForm({
+  categories,
+  onClose,
+  onSubmit,
+}: {
+  categories: any[]
+  onClose: () => void
+  onSubmit: (data: any) => Promise<any>
+}) {
+  const [formData, setFormData] = useState({
+    name: "",
+    year: new Date().getFullYear(),
+    month: "",
+    period: "monthly" as "monthly" | "quarterly" | "annual",
+    categories: [] as Array<{ categoryId: string; budgetedAmount: number }>,
+  })
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+
+    try {
+      await onSubmit({
+        ...formData,
+        month: formData.month ? Number.parseInt(formData.month) : undefined,
+        createdBy: "current-user",
+      })
+      toast.success("Budget created successfully")
+      onClose()
+    } catch (error) {
+      toast.error("Failed to create budget")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const addCategory = () => {
+    setFormData((prev) => ({
+      ...prev,
+      categories: [...prev.categories, { categoryId: "", budgetedAmount: 0 }],
+    }))
+  }
+
+  const updateCategory = (index: number, field: string, value: any) => {
+    setFormData((prev) => ({
+      ...prev,
+      categories: prev.categories.map((cat, i) => (i === index ? { ...cat, [field]: value } : cat)),
+    }))
+  }
+
+  const removeCategory = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      categories: prev.categories.filter((_, i) => i !== index),
+    }))
+  }
+
   return (
-    <form className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="category">Category</Label>
-          <Select>
-            <SelectTrigger>
-              <SelectValue placeholder="Select category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="room-operations">Room Operations</SelectItem>
-              <SelectItem value="staff-salaries">Staff Salaries</SelectItem>
-              <SelectItem value="utilities">Utilities</SelectItem>
-              <SelectItem value="marketing">Marketing</SelectItem>
-              <SelectItem value="maintenance">Maintenance</SelectItem>
-              <SelectItem value="food-beverage">Food & Beverage</SelectItem>
-            </SelectContent>
-          </Select>
+          <Label htmlFor="name">Budget Name</Label>
+          <Input
+            id="name"
+            placeholder="Budget name"
+            value={formData.name}
+            onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+            required
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="period">Period</Label>
-          <Select>
+          <Select
+            value={formData.period}
+            onValueChange={(value: "monthly" | "quarterly" | "annual") =>
+              setFormData((prev) => ({ ...prev, period: value }))
+            }
+          >
             <SelectTrigger>
-              <SelectValue placeholder="Select period" />
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="2024-01">January 2024</SelectItem>
-              <SelectItem value="2024-02">February 2024</SelectItem>
-              <SelectItem value="2024-03">March 2024</SelectItem>
-              <SelectItem value="2024-q1">Q1 2024</SelectItem>
-              <SelectItem value="2024">Annual 2024</SelectItem>
+              <SelectItem value="monthly">Monthly</SelectItem>
+              <SelectItem value="quarterly">Quarterly</SelectItem>
+              <SelectItem value="annual">Annual</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="budgetAmount">Budget Amount</Label>
-        <Input id="budgetAmount" type="number" placeholder="0" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="year">Year</Label>
+          <Input
+            id="year"
+            type="number"
+            value={formData.year}
+            onChange={(e) => setFormData((prev) => ({ ...prev, year: Number.parseInt(e.target.value) }))}
+            required
+          />
+        </div>
+        {formData.period === "monthly" && (
+          <div className="space-y-2">
+            <Label htmlFor="month">Month</Label>
+            <Select
+              value={formData.month}
+              onValueChange={(value) => setFormData((prev) => ({ ...prev, month: value }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select month" />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 12 }, (_, i) => (
+                  <SelectItem key={i + 1} value={(i + 1).toString()}>
+                    {new Date(2024, i).toLocaleString("default", { month: "long" })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <Label>Budget Categories</Label>
+          <Button type="button" variant="outline" size="sm" onClick={addCategory}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Category
+          </Button>
+        </div>
+
+        {formData.categories.map((category, index) => (
+          <div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-lg">
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select value={category.categoryId} onValueChange={(value) => updateCategory(index, "categoryId", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat._id} value={cat._id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Budgeted Amount</Label>
+              <Input
+                type="number"
+                placeholder="0"
+                value={category.budgetedAmount}
+                onChange={(e) => updateCategory(index, "budgetedAmount", Number.parseFloat(e.target.value) || 0)}
+              />
+            </div>
+            <div className="flex items-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="text-red-600 bg-transparent"
+                onClick={() => removeCategory(index)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className="flex justify-end space-x-3 pt-4">
         <Button type="button" variant="outline" onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" className="bg-[#1B2A41] hover:bg-[#1B2A41]/90">
-          Add Budget
+        <Button type="submit" className="bg-[#1B2A41] hover:bg-[#1B2A41]/90" disabled={loading}>
+          {loading ? "Creating..." : "Create Budget"}
         </Button>
       </div>
     </form>

@@ -30,6 +30,11 @@ import {
   Hotel,
   Menu,
   X,
+  Receipt,
+  TrendingUp,
+  Calculator,
+  PieChart,
+  FileBarChart,
 } from "lucide-react"
 
 interface MenuItem {
@@ -71,14 +76,22 @@ const menuGroups: MenuGroup[] = [
   {
     title: "Operations",
     defaultOpen: false,
-    items: [{ title: "Housekeeping", href: "/housekeeping", icon: ClipboardList }],
+    items: [
+      { title: "Housekeeping", href: "/housekeeping", icon: ClipboardList },
+      { title: "Billing", href: "/billing", icon: CreditCard },
+    ],
   },
   {
     title: "Financial",
     defaultOpen: false,
     items: [
-      { title: "Billing", href: "/billing", icon: CreditCard },
-      { title: "Accounting", href: "/accounting", icon: DollarSign },
+      { title: "Accounting Overview", href: "/accounting", icon: DollarSign },
+      { title: "Chart of Accounts", href: "/accounting/chart-of-accounts", icon: BarChart3 },
+      { title: "Transactions", href: "/accounting/transactions", icon: Receipt },
+      { title: "Expenses", href: "/accounting/expenses", icon: TrendingUp },
+      { title: "Financial Reports", href: "/accounting/reports", icon: FileBarChart },
+      { title: "Budget Management", href: "/accounting/budget", icon: Calculator },
+      { title: "Tax Management", href: "/accounting/tax", icon: PieChart },
     ],
   },
   {

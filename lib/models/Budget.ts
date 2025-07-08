@@ -1,6 +1,6 @@
 import mongoose from "mongoose"
 
-const budgetCategorySchema = new mongoose.Schema({
+const BudgetCategorySchema = new mongoose.Schema({
   categoryId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "TransactionCategory",
@@ -14,7 +14,6 @@ const budgetCategorySchema = new mongoose.Schema({
   actualAmount: {
     type: Number,
     default: 0,
-    min: 0,
   },
   variance: {
     type: Number,
@@ -26,7 +25,7 @@ const budgetCategorySchema = new mongoose.Schema({
   },
 })
 
-const budgetSchema = new mongoose.Schema(
+const BudgetSchema = new mongoose.Schema(
   {
     name: {
       type: String,
@@ -36,20 +35,13 @@ const budgetSchema = new mongoose.Schema(
     year: {
       type: Number,
       required: true,
-      min: 2020,
-      max: 2050,
     },
     month: {
       type: Number,
       min: 1,
       max: 12,
     },
-    period: {
-      type: String,
-      enum: ["monthly", "quarterly", "annual"],
-      required: true,
-    },
-    categories: [budgetCategorySchema],
+    categories: [BudgetCategorySchema],
     totalBudget: {
       type: Number,
       required: true,
@@ -58,7 +50,6 @@ const budgetSchema = new mongoose.Schema(
     totalActual: {
       type: Number,
       default: 0,
-      min: 0,
     },
     variance: {
       type: Number,
@@ -66,20 +57,8 @@ const budgetSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["draft", "approved", "active", "closed"],
+      enum: ["draft", "approved", "active"],
       default: "draft",
-    },
-    createdBy: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    approvedBy: {
-      type: String,
-      trim: true,
-    },
-    approvedAt: {
-      type: Date,
     },
   },
   {
@@ -87,25 +66,7 @@ const budgetSchema = new mongoose.Schema(
   },
 )
 
-// Indexes
-budgetSchema.index({ year: 1, month: 1 })
-budgetSchema.index({ status: 1 })
-budgetSchema.index({ createdBy: 1 })
-budgetSchema.index({ period: 1 })
+BudgetSchema.index({ year: 1, month: 1 })
+BudgetSchema.index({ status: 1 })
 
-// Pre-save middleware to calculate totals
-budgetSchema.pre("save", function (next) {
-  this.totalBudget = this.categories.reduce((sum, cat) => sum + cat.budgetedAmount, 0)
-  this.totalActual = this.categories.reduce((sum, cat) => sum + cat.actualAmount, 0)
-  this.variance = this.totalActual - this.totalBudget
-
-  // Calculate variance for each category
-  this.categories.forEach((cat) => {
-    cat.variance = cat.actualAmount - cat.budgetedAmount
-    cat.variancePercentage = cat.budgetedAmount > 0 ? (cat.variance / cat.budgetedAmount) * 100 : 0
-  })
-
-  next()
-})
-
-export default mongoose.models.Budget || mongoose.model("Budget", budgetSchema)
+export default mongoose.models.Budget || mongoose.model("Budget", BudgetSchema)

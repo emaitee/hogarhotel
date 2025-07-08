@@ -24,16 +24,28 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     await connectDB()
 
     const body = await request.json()
-    const { status, approvedBy, notes } = body
+    const { date, vendor, description, categoryId, amount, paymentMethod, reference, notes, status, approvedBy } = body
 
-    const updateData: any = { ...body }
+    const updateData: any = {
+      date,
+      vendor,
+      description,
+      categoryId,
+      amount,
+      paymentMethod,
+      reference,
+      notes,
+    }
 
     // Handle status changes
-    if (status === "approved" && !updateData.approvedAt) {
-      updateData.approvedAt = new Date()
-      if (approvedBy) updateData.approvedBy = approvedBy
-    } else if (status === "paid" && !updateData.paidAt) {
-      updateData.paidAt = new Date()
+    if (status) {
+      updateData.status = status
+      if (status === "approved" && approvedBy) {
+        updateData.approvedBy = approvedBy
+        updateData.approvedAt = new Date()
+      } else if (status === "paid") {
+        updateData.paidAt = new Date()
+      }
     }
 
     const expense = await Expense.findByIdAndUpdate(params.id, updateData, { new: true, runValidators: true }).populate(

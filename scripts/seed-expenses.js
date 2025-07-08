@@ -1,4 +1,4 @@
-const { MongoClient } = require("mongodb")
+const { MongoClient, ObjectId } = require("mongodb")
 
 const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/hotel-management"
 
@@ -157,12 +157,17 @@ async function seedAccountingData() {
     console.log("Connected to MongoDB")
 
     const db = client.db()
+    const expensesCollection = db.collection("expenses")
+    const categoriesCollection = db.collection("transactioncategories")
+    const budgetsCollection = db.collection("budgets")
+    const taxRecordsCollection = db.collection("taxrecords")
+    const financialReportsCollection = db.collection("financialreports")
 
     // Get transaction categories for expenses
-    const expenseCategories = await db.collection("transactioncategories").find({ type: "expense" }).toArray()
+    const expenseCategories = await categoriesCollection.find({ type: "expense" }).toArray()
 
     if (expenseCategories.length === 0) {
-      console.log("No expense categories found. Please run seed-accounts.js first.")
+      console.log("No expense categories found. Please run seed-transaction-categories.js first.")
       return
     }
 
@@ -173,13 +178,14 @@ async function seedAccountingData() {
     }))
 
     // Clear existing data
-    await db.collection("expenses").deleteMany({})
-    await db.collection("budgets").deleteMany({})
-    await db.collection("taxrecords").deleteMany({})
-    await db.collection("financialreports").deleteMany({})
+    await expensesCollection.deleteMany({})
+    await budgetsCollection.deleteMany({})
+    await taxRecordsCollection.deleteMany({})
+    await financialReportsCollection.deleteMany({})
+    console.log("Cleared existing data")
 
     // Insert expenses
-    const expenseResult = await db.collection("expenses").insertMany(expensesWithCategories)
+    const expenseResult = await expensesCollection.insertMany(expensesWithCategories)
     console.log(`Inserted ${expenseResult.insertedCount} expenses`)
 
     // Create budgets with categories
@@ -206,11 +212,11 @@ async function seedAccountingData() {
       })
     })
 
-    const budgetResult = await db.collection("budgets").insertMany(budgetsWithCategories)
+    const budgetResult = await budgetsCollection.insertMany(budgetsWithCategories)
     console.log(`Inserted ${budgetResult.insertedCount} budgets`)
 
     // Insert tax records
-    const taxResult = await db.collection("taxrecords").insertMany(sampleTaxRecords)
+    const taxResult = await taxRecordsCollection.insertMany(sampleTaxRecords)
     console.log(`Inserted ${taxResult.insertedCount} tax records`)
 
     // Create a sample financial report
@@ -256,14 +262,94 @@ async function seedAccountingData() {
       generatedBy: "system",
     }
 
-    const reportResult = await db.collection("financialreports").insertOne(sampleReport)
+    const reportResult = await financialReportsCollection.insertOne(sampleReport)
     console.log(`Inserted 1 financial report`)
+
+    // Generate additional expenses for the last 6 months
+    const vendors = [
+      "ABC Utilities Company",
+      "City Power & Light",
+      "Metro Water Works",
+      "Office Supplies Plus",
+      "Professional Cleaning Co",
+      "Tech Solutions Inc",
+      "Marketing Agency Pro",
+      "Insurance Partners LLC",
+      "Legal Services Group",
+      "Maintenance Masters",
+    ]
+
+    const paymentMethods = ["cash", "bank_transfer", "cheque", "card"]
+    const statuses = ["pending", "approved", "paid", "rejected"]
+
+    // Generate expenses for the last 6 months
+    const startDate = new Date()
+    startDate.setMonth(startDate.getMonth() - 6)
+
+    for (let i = 0; i < 100; i++) {
+      const randomDate = new Date(startDate.getTime() + Math.random() * (Date.now() - startDate.getTime()))
+      const randomCategory = expenseCategories[Math.floor(Math.random() * expenseCategories.length)]
+      const randomVendor = vendors[Math.floor(Math.random() * vendors.length)]
+      const randomAmount = Math.floor(Math.random() * 5000) + 100
+      const randomStatus = statuses[Math.floor(Math.random() * statuses.length)]
+      const randomPaymentMethod = paymentMethods[Math.floor(Math.random() * paymentMethods.length)]
+
+      const expense = {
+        date: randomDate,
+        vendor: randomVendor,
+        description: `${randomCategory.name} expense from ${randomVendor}`,
+        categoryId: randomCategory._id,
+        amount: randomAmount,
+        paymentMethod: randomPaymentMethod,
+        reference: `EXP-${Date.now()}-${i}`,
+        status: randomStatus,
+        notes: Math.random() > 0.7 ? "Additional notes for this expense" : undefined,
+        createdBy: "system",
+        createdAt: randomDate,
+        updatedAt: randomDate,
+      }
+
+      // Add approval/payment dates for approved/paid expenses
+      if (randomStatus === "approved" || randomStatus === "paid") {
+        expense.approvedBy = "admin"
+        expense.approvedAt = new Date(randomDate.getTime() + 24 * 60 * 60 * 1000) // Next day
+      }
+
+      if (randomStatus === "paid") {
+        expense.paidAt = new Date(randomDate.getTime() + 48 * 60 * 60 * 1000) // Two days later
+      }
+
+      expensesWithCategories.push(expense)
+    }
+
+    // Insert additional expenses
+    const additionalExpenseResult = await expensesCollection.insertMany(expensesWithCategories.slice(5))
+    console.log(`Inserted ${additionalExpenseResult.insertedCount} additional expenses`)
+
+    // Display summary
+    const summary = await expensesCollection
+      .aggregate([
+        {
+          $group: {
+            _id: "$status",
+            count: { $sum: 1 },
+            total: { $sum: "$amount" },
+          },
+        },
+      ])
+      .toArray()
+
+    console.log("\nExpense Summary:")
+    summary.forEach((item) => {
+      console.log(`${item._id}: ${item.count} expenses, $${item.total.toFixed(2)}`)
+    })
 
     console.log("Accounting data seeding completed successfully!")
   } catch (error) {
     console.error("Error seeding accounting data:", error)
   } finally {
     await client.close()
+    console.log("Disconnected from MongoDB")
   }
 }
 

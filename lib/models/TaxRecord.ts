@@ -1,16 +1,21 @@
 import mongoose from "mongoose"
 
-const taxRecordSchema = new mongoose.Schema(
+const TaxRecordSchema = new mongoose.Schema(
   {
-    taxType: {
+    type: {
       type: String,
-      enum: ["VAT", "Corporate Income Tax", "Withholding Tax", "PAYE", "Personal Income Tax"],
+      enum: ["vat", "income_tax", "withholding_tax"],
       required: true,
     },
     period: {
-      type: String,
-      required: true,
-      trim: true,
+      startDate: {
+        type: Date,
+        required: true,
+      },
+      endDate: {
+        type: Date,
+        required: true,
+      },
     },
     taxableAmount: {
       type: Number,
@@ -30,17 +35,17 @@ const taxRecordSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "filed", "paid", "overdue"],
+      enum: ["pending", "filed", "paid"],
       default: "pending",
     },
     dueDate: {
       type: Date,
       required: true,
     },
-    filedDate: {
+    filedAt: {
       type: Date,
     },
-    paidDate: {
+    paidAt: {
       type: Date,
     },
     reference: {
@@ -51,46 +56,15 @@ const taxRecordSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    attachments: [
-      {
-        name: String,
-        url: String,
-        type: String,
-      },
-    ],
-    createdBy: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    filedBy: {
-      type: String,
-      trim: true,
-    },
   },
   {
     timestamps: true,
   },
 )
 
-// Indexes
-taxRecordSchema.index({ taxType: 1 })
-taxRecordSchema.index({ period: 1 })
-taxRecordSchema.index({ status: 1 })
-taxRecordSchema.index({ dueDate: 1 })
-taxRecordSchema.index({ createdBy: 1 })
+TaxRecordSchema.index({ type: 1 })
+TaxRecordSchema.index({ status: 1 })
+TaxRecordSchema.index({ dueDate: 1 })
+TaxRecordSchema.index({ "period.startDate": 1, "period.endDate": 1 })
 
-// Pre-save middleware to calculate tax amount
-taxRecordSchema.pre("save", function (next) {
-  if (this.isModified("taxableAmount") || this.isModified("taxRate")) {
-    this.taxAmount = (this.taxableAmount * this.taxRate) / 100
-  }
-  next()
-})
-
-// Method to check if overdue
-taxRecordSchema.methods.isOverdue = function () {
-  return this.status !== "paid" && new Date() > this.dueDate
-}
-
-export default mongoose.models.TaxRecord || mongoose.model("TaxRecord", taxRecordSchema)
+export default mongoose.models.TaxRecord || mongoose.model("TaxRecord", TaxRecordSchema)

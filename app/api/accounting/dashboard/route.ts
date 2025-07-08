@@ -1,254 +1,255 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { connectToDatabase } from "@/lib/mongodb"
+import { connectDB } from "@/lib/mongodb"
 import Transaction from "@/lib/models/Transaction"
 import Account from "@/lib/models/Account"
 
 export async function GET(request: NextRequest) {
   try {
-    await connectToDatabase()
+    await connectDB()
 
     const { searchParams } = new URL(request.url)
-    const period = searchParams.get("period") || "month" // month, quarter, year
+    const period = searchParams.get("period") || "monthly"
     const year = Number.parseInt(searchParams.get("year") || new Date().getFullYear().toString())
-    const month = Number.parseInt(searchParams.get("month") || (new Date().getMonth() + 1).toString())
+    const month = searchParams.get("month") ? Number.parseInt(searchParams.get("month")!) : new Date().getMonth() + 1
 
     // Calculate date ranges
-    let startDate: Date
-    let endDate: Date
-    let previousStartDate: Date
-    let previousEndDate: Date
+    let startDate: Date, endDate: Date, prevStartDate: Date, prevEndDate: Date
 
-    if (period === "month") {
+    if (period === "monthly") {
       startDate = new Date(year, month - 1, 1)
-      endDate = new Date(year, month, 0, 23, 59, 59)
-      previousStartDate = new Date(year, month - 2, 1)
-      previousEndDate = new Date(year, month - 1, 0, 23, 59, 59)
-    } else if (period === "quarter") {
-      const quarterStart = Math.floor((month - 1) / 3) * 3
-      startDate = new Date(year, quarterStart, 1)
-      endDate = new Date(year, quarterStart + 3, 0, 23, 59, 59)
-      previousStartDate = new Date(year, quarterStart - 3, 1)
-      previousEndDate = new Date(year, quarterStart, 0, 23, 59, 59)
+      endDate = new Date(year, month, 0)
+      prevStartDate = new Date(year, month - 2, 1)
+      prevEndDate = new Date(year, month - 1, 0)
+    } else if (period === "quarterly") {
+      const quarter = Math.ceil(month / 3)
+      startDate = new Date(year, (quarter - 1) * 3, 1)
+      endDate = new Date(year, quarter * 3, 0)
+      prevStartDate = new Date(year, (quarter - 2) * 3, 1)
+      prevEndDate = new Date(year, (quarter - 1) * 3, 0)
     } else {
       startDate = new Date(year, 0, 1)
-      endDate = new Date(year, 11, 31, 23, 59, 59)
-      previousStartDate = new Date(year - 1, 0, 1)
-      previousEndDate = new Date(year - 1, 11, 31, 23, 59, 59)
+      endDate = new Date(year, 11, 31)
+      prevStartDate = new Date(year - 1, 0, 1)
+      prevEndDate = new Date(year - 1, 11, 31)
     }
 
-    // Get revenue accounts (type: revenue)
-    const revenueAccounts = await Account.find({ type: "revenue" }).select("_id")
-    const revenueAccountIds = revenueAccounts.map((acc) => acc._id)
+    const [currentRevenue, currentExpenses, previousRevenue, previousExpenses, cashFlow, recentActivity] =
+      await Promise.all([
+        // Current period revenue
+        Transaction.aggregate([
+          {
+            $lookup: {
+              from: "accounts",
+              localField: "accountId",
+              foreignField: "_id",
+              as: "account",
+            },
+          },
+          {
+            $unwind: "$account",
+          },
+          {
+            $match: {
+              date: { $gte: startDate, $lte: endDate },
+              "account.type": "revenue",
+              type: "credit",
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              total: { $sum: "$amount" },
+            },
+          },
+        ]),
 
-    // Get expense accounts (type: expense)
-    const expenseAccounts = await Account.find({ type: "expense" }).select("_id")
-    const expenseAccountIds = expenseAccounts.map((acc) => acc._id)
+        // Current period expenses
+        Transaction.aggregate([
+          {
+            $lookup: {
+              from: "accounts",
+              localField: "accountId",
+              foreignField: "_id",
+              as: "account",
+            },
+          },
+          {
+            $unwind: "$account",
+          },
+          {
+            $match: {
+              date: { $gte: startDate, $lte: endDate },
+              "account.type": "expense",
+              type: "debit",
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              total: { $sum: "$amount" },
+            },
+          },
+        ]),
 
-    // Get cash accounts (current assets)
-    const cashAccounts = await Account.find({
-      type: "asset",
-      category: "Current Assets",
-      name: { $regex: /(cash|bank)/i },
-    }).select("_id balance")
+        // Previous period revenue
+        Transaction.aggregate([
+          {
+            $lookup: {
+              from: "accounts",
+              localField: "accountId",
+              foreignField: "_id",
+              as: "account",
+            },
+          },
+          {
+            $unwind: "$account",
+          },
+          {
+            $match: {
+              date: { $gte: prevStartDate, $lte: prevEndDate },
+              "account.type": "revenue",
+              type: "credit",
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              total: { $sum: "$amount" },
+            },
+          },
+        ]),
 
-    // Calculate current period revenue
-    const currentRevenue = await Transaction.aggregate([
-      {
-        $match: {
-          date: { $gte: startDate, $lte: endDate },
-          status: "Posted",
-          "entries.accountId": { $in: revenueAccountIds },
-        },
-      },
-      {
-        $unwind: "$entries",
-      },
-      {
-        $match: {
-          "entries.accountId": { $in: revenueAccountIds },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: "$entries.credit" },
-        },
-      },
-    ])
+        // Previous period expenses
+        Transaction.aggregate([
+          {
+            $lookup: {
+              from: "accounts",
+              localField: "accountId",
+              foreignField: "_id",
+              as: "account",
+            },
+          },
+          {
+            $unwind: "$account",
+          },
+          {
+            $match: {
+              date: { $gte: prevStartDate, $lte: prevEndDate },
+              "account.type": "expense",
+              type: "debit",
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              total: { $sum: "$amount" },
+            },
+          },
+        ]),
 
-    // Calculate previous period revenue
-    const previousRevenue = await Transaction.aggregate([
-      {
-        $match: {
-          date: { $gte: previousStartDate, $lte: previousEndDate },
-          status: "Posted",
-          "entries.accountId": { $in: revenueAccountIds },
-        },
-      },
-      {
-        $unwind: "$entries",
-      },
-      {
-        $match: {
-          "entries.accountId": { $in: revenueAccountIds },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: "$entries.credit" },
-        },
-      },
-    ])
+        // Cash flow (current cash and bank balances)
+        Account.aggregate([
+          {
+            $match: {
+              type: "asset",
+              category: { $in: ["cash", "bank"] },
+              isActive: true,
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              total: { $sum: "$balance" },
+            },
+          },
+        ]),
 
-    // Calculate current period expenses
-    const currentExpenses = await Transaction.aggregate([
-      {
-        $match: {
-          date: { $gte: startDate, $lte: endDate },
-          status: "Posted",
-          "entries.accountId": { $in: expenseAccountIds },
-        },
-      },
-      {
-        $unwind: "$entries",
-      },
-      {
-        $match: {
-          "entries.accountId": { $in: expenseAccountIds },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: "$entries.debit" },
-        },
-      },
-    ])
+        // Recent activity (last 7 days)
+        Transaction.aggregate([
+          {
+            $match: {
+              date: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+            },
+          },
+          {
+            $lookup: {
+              from: "accounts",
+              localField: "accountId",
+              foreignField: "_id",
+              as: "account",
+            },
+          },
+          {
+            $unwind: "$account",
+          },
+          {
+            $sort: { date: -1 },
+          },
+          {
+            $limit: 10,
+          },
+          {
+            $project: {
+              date: 1,
+              description: 1,
+              reference: 1,
+              amount: 1,
+              type: 1,
+              account: {
+                name: 1,
+                type: 1,
+              },
+            },
+          },
+        ]),
+      ])
 
-    // Calculate previous period expenses
-    const previousExpenses = await Transaction.aggregate([
-      {
-        $match: {
-          date: { $gte: previousStartDate, $lte: previousEndDate },
-          status: "Posted",
-          "entries.accountId": { $in: expenseAccountIds },
-        },
-      },
-      {
-        $unwind: "$entries",
-      },
-      {
-        $match: {
-          "entries.accountId": { $in: expenseAccountIds },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: "$entries.debit" },
-        },
-      },
-    ])
+    // Calculate metrics
+    const revenue = currentRevenue[0]?.total || 0
+    const expenses = currentExpenses[0]?.total || 0
+    const profit = revenue - expenses
+    const cash = cashFlow[0]?.total || 0
 
-    // Get recent transactions
-    const recentTransactions = await Transaction.find({
-      status: "Posted",
-      date: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }, // Last 7 days
-    })
-      .populate("entries.accountId", "name type")
-      .sort({ date: -1 })
-      .limit(10)
-
-    // Calculate totals
-    const currentRevenueTotal = currentRevenue[0]?.total || 0
-    const previousRevenueTotal = previousRevenue[0]?.total || 0
-    const currentExpensesTotal = currentExpenses[0]?.total || 0
-    const previousExpensesTotal = previousExpenses[0]?.total || 0
-
-    const currentProfit = currentRevenueTotal - currentExpensesTotal
-    const previousProfit = previousRevenueTotal - previousExpensesTotal
-
-    const totalCashFlow = cashAccounts.reduce((sum, account) => sum + (account.balance || 0), 0)
+    const prevRevenue = previousRevenue[0]?.total || 0
+    const prevExpenses = previousExpenses[0]?.total || 0
+    const prevProfit = prevRevenue - prevExpenses
 
     // Calculate growth percentages
-    const revenueGrowth =
-      previousRevenueTotal > 0 ? ((currentRevenueTotal - previousRevenueTotal) / previousRevenueTotal) * 100 : 0
+    const revenueGrowth = prevRevenue > 0 ? ((revenue - prevRevenue) / prevRevenue) * 100 : 0
+    const expenseGrowth = prevExpenses > 0 ? ((expenses - prevExpenses) / prevExpenses) * 100 : 0
+    const profitGrowth = prevProfit !== 0 ? ((profit - prevProfit) / Math.abs(prevProfit)) * 100 : 0
 
-    const expensesGrowth =
-      previousExpensesTotal > 0 ? ((currentExpensesTotal - previousExpensesTotal) / previousExpensesTotal) * 100 : 0
-
-    const profitGrowth = previousProfit !== 0 ? ((currentProfit - previousProfit) / Math.abs(previousProfit)) * 100 : 0
-
-    // Format recent activity
-    const recentActivity = recentTransactions.map((transaction) => {
-      const revenueEntry = transaction.entries.find((entry) =>
-        revenueAccountIds.some((id) => id.equals(entry.accountId._id)),
-      )
-      const expenseEntry = transaction.entries.find((entry) =>
-        expenseAccountIds.some((id) => id.equals(entry.accountId._id)),
-      )
-
-      let type = "neutral"
-      let amount = 0
-      let accountName = ""
-
-      if (revenueEntry) {
-        type = "revenue"
-        amount = revenueEntry.credit
-        accountName = revenueEntry.accountId.name
-      } else if (expenseEntry) {
-        type = "expense"
-        amount = expenseEntry.debit
-        accountName = expenseEntry.accountId.name
-      }
-
-      return {
-        id: transaction._id,
-        description: transaction.description,
-        reference: transaction.reference,
-        amount,
-        type,
-        accountName,
-        date: transaction.date,
-        createdAt: transaction.createdAt,
-      }
-    })
-
-    const summary = {
-      revenue: {
-        current: currentRevenueTotal,
-        previous: previousRevenueTotal,
-        growth: revenueGrowth,
-      },
-      expenses: {
-        current: currentExpensesTotal,
-        previous: previousExpensesTotal,
-        growth: expensesGrowth,
-      },
-      profit: {
-        current: currentProfit,
-        previous: previousProfit,
-        growth: profitGrowth,
-      },
-      cashFlow: {
-        current: totalCashFlow,
-        previous: totalCashFlow, // For now, using current as we don't track historical balances
-        growth: 0,
+    return NextResponse.json({
+      metrics: {
+        revenue: {
+          current: revenue,
+          previous: prevRevenue,
+          growth: revenueGrowth,
+        },
+        expenses: {
+          current: expenses,
+          previous: prevExpenses,
+          growth: expenseGrowth,
+        },
+        profit: {
+          current: profit,
+          previous: prevProfit,
+          growth: profitGrowth,
+        },
+        cashFlow: {
+          current: cash,
+          growth: 0, // Cash flow growth would need historical data
+        },
       },
       recentActivity,
       period: {
         type: period,
         startDate,
         endDate,
-        year,
-        month,
       },
-    }
-
-    return NextResponse.json(summary)
+    })
   } catch (error) {
     console.error("Error fetching accounting dashboard:", error)
-    return NextResponse.json({ error: "Failed to fetch accounting dashboard data" }, { status: 500 })
+    return NextResponse.json({ error: "Failed to fetch dashboard data" }, { status: 500 })
   }
 }

@@ -1,6 +1,6 @@
 import mongoose from "mongoose"
 
-const expenseSchema = new mongoose.Schema(
+const ExpenseSchema = new mongoose.Schema(
   {
     date: {
       type: Date,
@@ -37,7 +37,7 @@ const expenseSchema = new mongoose.Schema(
       trim: true,
     },
     receipt: {
-      type: String, // URL to receipt image/document
+      type: String,
       trim: true,
     },
     status: {
@@ -70,22 +70,9 @@ const expenseSchema = new mongoose.Schema(
   },
 )
 
-// Indexes
-expenseSchema.index({ date: -1 })
-expenseSchema.index({ vendor: 1 })
-expenseSchema.index({ status: 1 })
-expenseSchema.index({ categoryId: 1 })
-expenseSchema.index({ createdBy: 1 })
+ExpenseSchema.index({ date: -1 })
+ExpenseSchema.index({ vendor: 1 })
+ExpenseSchema.index({ status: 1 })
+ExpenseSchema.index({ categoryId: 1 })
 
-// Virtual for category population
-expenseSchema.virtual("category", {
-  ref: "TransactionCategory",
-  localField: "categoryId",
-  foreignField: "_id",
-  justOne: true,
-})
-
-expenseSchema.set("toJSON", { virtuals: true })
-expenseSchema.set("toObject", { virtuals: true })
-
-export default mongoose.models.Expense || mongoose.model("Expense", expenseSchema)
+export default mongoose.models.Expense || mongoose.model("Expense", ExpenseSchema)

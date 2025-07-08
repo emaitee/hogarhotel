@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 
-interface DashboardSummary {
+interface DashboardMetrics {
   revenue: {
     current: number
     previous: number
@@ -20,84 +20,72 @@ interface DashboardSummary {
   }
   cashFlow: {
     current: number
-    previous: number
     growth: number
   }
-  recentActivity: Array<{
-    id: string
-    description: string
-    reference?: string
-    amount: number
-    type: "revenue" | "expense" | "neutral"
-    accountName: string
-    date: string
-    createdAt: string
-  }>
+}
+
+interface RecentActivity {
+  _id: string
+  date: string
+  description: string
+  reference: string
+  amount: number
+  type: "debit" | "credit"
+  account: {
+    name: string
+    type: string
+  }
+}
+
+interface DashboardData {
+  metrics: DashboardMetrics
+  recentActivity: RecentActivity[]
   period: {
     type: string
     startDate: string
     endDate: string
-    year: number
-    month: number
   }
 }
 
-interface UseAccountingDashboardReturn {
-  summary: DashboardSummary | null
-  loading: boolean
-  error: string | null
-  fetchSummary: (filters?: {
-    period?: string
-    year?: number
-    month?: number
-  }) => Promise<void>
-}
-
-export function useAccountingDashboard(): UseAccountingDashboardReturn {
-  const [summary, setSummary] = useState<DashboardSummary | null>(null)
-  const [loading, setLoading] = useState(false)
+export function useAccountingDashboard(period = "monthly", year?: number, month?: number) {
+  const [data, setData] = useState<DashboardData | null>(null)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchSummary = async (
-    filters: {
-      period?: string
-      year?: number
-      month?: number
-    } = {},
-  ) => {
+  const fetchDashboard = async () => {
     try {
       setLoading(true)
       setError(null)
 
-      const params = new URLSearchParams()
-      if (filters.period) params.append("period", filters.period)
-      if (filters.year) params.append("year", filters.year.toString())
-      if (filters.month) params.append("month", filters.month.toString())
+      const params = new URLSearchParams({
+        period,
+        ...(year && { year: year.toString() }),
+        ...(month && { month: month.toString() }),
+      })
 
       const response = await fetch(`/api/accounting/dashboard?${params}`)
+
       if (!response.ok) {
-        throw new Error("Failed to fetch accounting dashboard data")
+        throw new Error("Failed to fetch dashboard data")
       }
 
-      const data = await response.json()
-      setSummary(data)
+      const result = await response.json()
+      setData(result)
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "An error occurred"
-      setError(errorMessage)
-      console.error("Error fetching accounting dashboard:", err)
+      setError(err instanceof Error ? err.message : "An error occurred")
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchSummary()
-  }, [])
+    fetchDashboard()
+  }, [period, year, month])
 
   return {
-    summary,
+    data,
     loading,
     error,
-    fetchSummary,
+    refetch: fetchDashboard,
   }
 }

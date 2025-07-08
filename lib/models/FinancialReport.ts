@@ -1,6 +1,6 @@
 import mongoose from "mongoose"
 
-const financialReportSchema = new mongoose.Schema(
+const FinancialReportSchema = new mongoose.Schema(
   {
     name: {
       type: String,
@@ -9,7 +9,7 @@ const financialReportSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["profit-loss", "balance-sheet", "cash-flow", "revenue-analysis", "expense-analysis", "budget-variance"],
+      enum: ["balance_sheet", "income_statement", "cash_flow", "trial_balance"],
       required: true,
     },
     period: {
@@ -26,24 +26,19 @@ const financialReportSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       required: true,
     },
-    summary: {
-      totalRevenue: { type: Number, default: 0 },
-      totalExpenses: { type: Number, default: 0 },
-      netProfit: { type: Number, default: 0 },
-      profitMargin: { type: Number, default: 0 },
-    },
-    status: {
-      type: String,
-      enum: ["generating", "completed", "failed"],
-      default: "generating",
+    generatedAt: {
+      type: Date,
+      default: Date.now,
     },
     generatedBy: {
       type: String,
       required: true,
       trim: true,
     },
-    parameters: {
-      type: mongoose.Schema.Types.Mixed,
+    status: {
+      type: String,
+      enum: ["draft", "final"],
+      default: "final",
     },
   },
   {
@@ -51,11 +46,8 @@ const financialReportSchema = new mongoose.Schema(
   },
 )
 
-// Indexes
-financialReportSchema.index({ type: 1 })
-financialReportSchema.index({ "period.startDate": 1, "period.endDate": 1 })
-financialReportSchema.index({ generatedBy: 1 })
-financialReportSchema.index({ status: 1 })
-financialReportSchema.index({ createdAt: -1 })
+FinancialReportSchema.index({ type: 1 })
+FinancialReportSchema.index({ generatedAt: -1 })
+FinancialReportSchema.index({ "period.startDate": 1, "period.endDate": 1 })
 
-export default mongoose.models.FinancialReport || mongoose.model("FinancialReport", financialReportSchema)
+export default mongoose.models.FinancialReport || mongoose.model("FinancialReport", FinancialReportSchema)

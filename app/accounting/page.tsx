@@ -1,466 +1,277 @@
 "use client"
 
-import { motion } from "framer-motion"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { formatCurrency } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAccountingDashboard } from "@/hooks/useAccountingDashboard"
 import {
-  TrendingUp,
-  TrendingDown,
   DollarSign,
-  Receipt,
+  TrendingUp,
   CreditCard,
-  PieChart,
-  BarChart3,
-  FileText,
-  Calculator,
-  Wallet,
+  PiggyBank,
   RefreshCw,
   Calendar,
+  ArrowUpIcon,
+  ArrowDownIcon,
 } from "lucide-react"
-import Link from "next/link"
-import { useState } from "react"
-import { Skeleton } from "@/components/ui/skeleton"
+import { formatCurrency } from "@/lib/utils"
 
 export default function AccountingPage() {
-  const { summary, loading, error, fetchSummary } = useAccountingDashboard()
-  const [selectedPeriod, setSelectedPeriod] = useState("month")
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
+  const [period, setPeriod] = useState("monthly")
+  const [year, setYear] = useState(new Date().getFullYear())
+  const [month, setMonth] = useState(new Date().getMonth() + 1)
 
-  const quickActions = [
-    {
-      title: "Chart of Accounts",
-      description: "Manage your account structure",
-      href: "/accounting/chart-of-accounts",
-      icon: BarChart3,
-      color: "bg-blue-50 text-blue-600",
-    },
-    {
-      title: "Transactions",
-      description: "Record and view transactions",
-      href: "/accounting/transactions",
-      icon: Receipt,
-      color: "bg-green-50 text-green-600",
-    },
-    {
-      title: "Expenses",
-      description: "Track and manage expenses",
-      href: "/accounting/expenses",
-      icon: CreditCard,
-      color: "bg-red-50 text-red-600",
-    },
-    {
-      title: "Financial Reports",
-      description: "Generate financial statements",
-      href: "/accounting/reports",
-      icon: FileText,
-      color: "bg-purple-50 text-purple-600",
-    },
-    {
-      title: "Budget Management",
-      description: "Plan and track budgets",
-      href: "/accounting/budget",
-      icon: Calculator,
-      color: "bg-yellow-50 text-yellow-600",
-    },
-    {
-      title: "Tax Management",
-      description: "Handle tax calculations",
-      href: "/accounting/tax",
-      icon: PieChart,
-      color: "bg-indigo-50 text-indigo-600",
-    },
+  const { data, loading, error, refetch } = useAccountingDashboard(period, year, month)
+
+  const currentYear = new Date().getFullYear()
+  const years = Array.from({ length: 5 }, (_, i) => currentYear - i)
+  const months = [
+    { value: 1, label: "January" },
+    { value: 2, label: "February" },
+    { value: 3, label: "March" },
+    { value: 4, label: "April" },
+    { value: 5, label: "May" },
+    { value: 6, label: "June" },
+    { value: 7, label: "July" },
+    { value: 8, label: "August" },
+    { value: 9, label: "September" },
+    { value: 10, label: "October" },
+    { value: 11, label: "November" },
+    { value: 12, label: "December" },
   ]
 
-  const handlePeriodChange = (period: string) => {
-    setSelectedPeriod(period)
-    fetchSummary({ period, year: selectedYear, month: selectedMonth })
-  }
+  const formatGrowth = (growth: number) => {
+    const isPositive = growth >= 0
+    const Icon = isPositive ? ArrowUpIcon : ArrowDownIcon
+    const color = isPositive ? "text-green-600" : "text-red-600"
 
-  const handleYearChange = (year: string) => {
-    const yearNum = Number.parseInt(year)
-    setSelectedYear(yearNum)
-    fetchSummary({ period: selectedPeriod, year: yearNum, month: selectedMonth })
-  }
-
-  const handleMonthChange = (month: string) => {
-    const monthNum = Number.parseInt(month)
-    setSelectedMonth(monthNum)
-    fetchSummary({ period: selectedPeriod, year: selectedYear, month: monthNum })
-  }
-
-  const handleRefresh = () => {
-    fetchSummary({ period: selectedPeriod, year: selectedYear, month: selectedMonth })
-  }
-
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case "revenue":
-        return "bg-green-500"
-      case "expense":
-        return "bg-red-500"
-      default:
-        return "bg-blue-500"
-    }
-  }
-
-  const formatActivityAmount = (amount: number, type: string) => {
-    const prefix = type === "expense" ? "-" : ""
-    return `${prefix}${formatCurrency(amount)}`
-  }
-
-  const formatActivityColor = (type: string) => {
-    return type === "expense" ? "text-red-600" : "text-green-600"
+    return (
+      <div className={`flex items-center gap-1 ${color}`}>
+        <Icon className="h-4 w-4" />
+        <span className="text-sm font-medium">{Math.abs(growth).toFixed(1)}%</span>
+      </div>
+    )
   }
 
   if (error) {
     return (
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Accounting</h1>
-            <p className="text-gray-600 dark:text-gray-400">Complete financial management and accounting system</p>
+            <h1 className="text-3xl font-bold tracking-tight">Accounting Overview</h1>
+            <p className="text-muted-foreground">Monitor your hotel's financial performance and key metrics</p>
           </div>
         </div>
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-center">
-              <p className="text-red-600 mb-4">Error loading accounting data: {error}</p>
-              <Button onClick={handleRefresh} variant="outline">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Retry
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+
+        <Alert>
+          <AlertDescription>
+            Error loading dashboard data: {error}
+            <Button variant="outline" size="sm" onClick={refetch} className="ml-2 bg-transparent">
+              Retry
+            </Button>
+          </AlertDescription>
+        </Alert>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex justify-between items-center"
-      >
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Accounting</h1>
-          <p className="text-gray-600 dark:text-gray-400">Complete financial management and accounting system</p>
+          <h1 className="text-3xl font-bold tracking-tight">Accounting Overview</h1>
+          <p className="text-muted-foreground">Monitor your hotel's financial performance and key metrics</p>
         </div>
-        <div className="flex items-center space-x-4">
-          <Select value={selectedPeriod} onValueChange={handlePeriodChange}>
+
+        <div className="flex items-center gap-4">
+          <Select value={period} onValueChange={setPeriod}>
             <SelectTrigger className="w-32">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="month">Monthly</SelectItem>
-              <SelectItem value="quarter">Quarterly</SelectItem>
-              <SelectItem value="year">Yearly</SelectItem>
+              <SelectItem value="monthly">Monthly</SelectItem>
+              <SelectItem value="quarterly">Quarterly</SelectItem>
+              <SelectItem value="yearly">Yearly</SelectItem>
             </SelectContent>
           </Select>
 
-          <Select value={selectedYear.toString()} onValueChange={handleYearChange}>
+          <Select value={year.toString()} onValueChange={(value) => setYear(Number.parseInt(value))}>
             <SelectTrigger className="w-24">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((year) => (
-                <SelectItem key={year} value={year.toString()}>
-                  {year}
+              {years.map((y) => (
+                <SelectItem key={y} value={y.toString()}>
+                  {y}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          {selectedPeriod === "month" && (
-            <Select value={selectedMonth.toString()} onValueChange={handleMonthChange}>
+          {period === "monthly" && (
+            <Select value={month.toString()} onValueChange={(value) => setMonth(Number.parseInt(value))}>
               <SelectTrigger className="w-32">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
-                  <SelectItem key={month} value={month.toString()}>
-                    {new Date(2024, month - 1).toLocaleString("default", { month: "long" })}
+                {months.map((m) => (
+                  <SelectItem key={m.value} value={m.value.toString()}>
+                    {m.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           )}
 
-          <Button onClick={handleRefresh} variant="outline" size="sm">
+          <Button variant="outline" size="icon" onClick={refetch} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>
-      </motion.div>
-
-      {/* Financial Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <Card>
-            <CardContent className="p-6">
-              {loading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-8 w-32" />
-                  <Skeleton className="h-4 w-16" />
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                      {selectedPeriod === "month" ? "Monthly" : selectedPeriod === "quarter" ? "Quarterly" : "Yearly"}{" "}
-                      Revenue
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {formatCurrency(summary?.revenue.current || 0)}
-                    </p>
-                    <div className="flex items-center mt-1">
-                      {(summary?.revenue.growth || 0) > 0 ? (
-                        <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-                      ) : (
-                        <TrendingDown className="h-4 w-4 text-red-500 mr-1" />
-                      )}
-                      <span
-                        className={`text-sm ${(summary?.revenue.growth || 0) > 0 ? "text-green-500" : "text-red-500"}`}
-                      >
-                        {(summary?.revenue.growth || 0) > 0 ? "+" : ""}
-                        {(summary?.revenue.growth || 0).toFixed(1)}%
-                      </span>
-                    </div>
-                  </div>
-                  <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-full">
-                    <DollarSign className="h-6 w-6 text-green-600" />
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <Card>
-            <CardContent className="p-6">
-              {loading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-8 w-32" />
-                  <Skeleton className="h-4 w-16" />
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                      {selectedPeriod === "month" ? "Monthly" : selectedPeriod === "quarter" ? "Quarterly" : "Yearly"}{" "}
-                      Expenses
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {formatCurrency(summary?.expenses.current || 0)}
-                    </p>
-                    <div className="flex items-center mt-1">
-                      {(summary?.expenses.growth || 0) < 0 ? (
-                        <TrendingDown className="h-4 w-4 text-green-500 mr-1" />
-                      ) : (
-                        <TrendingUp className="h-4 w-4 text-red-500 mr-1" />
-                      )}
-                      <span
-                        className={`text-sm ${(summary?.expenses.growth || 0) < 0 ? "text-green-500" : "text-red-500"}`}
-                      >
-                        {(summary?.expenses.growth || 0) > 0 ? "+" : ""}
-                        {(summary?.expenses.growth || 0).toFixed(1)}%
-                      </span>
-                    </div>
-                  </div>
-                  <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-full">
-                    <CreditCard className="h-6 w-6 text-red-600" />
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-          <Card>
-            <CardContent className="p-6">
-              {loading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-8 w-32" />
-                  <Skeleton className="h-4 w-16" />
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Net Profit</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {formatCurrency(summary?.profit.current || 0)}
-                    </p>
-                    <div className="flex items-center mt-1">
-                      {(summary?.profit.growth || 0) > 0 ? (
-                        <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-                      ) : (
-                        <TrendingDown className="h-4 w-4 text-red-500 mr-1" />
-                      )}
-                      <span
-                        className={`text-sm ${(summary?.profit.growth || 0) > 0 ? "text-green-500" : "text-red-500"}`}
-                      >
-                        {(summary?.profit.growth || 0) > 0 ? "+" : ""}
-                        {(summary?.profit.growth || 0).toFixed(1)}%
-                      </span>
-                    </div>
-                  </div>
-                  <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-full">
-                    <TrendingUp className="h-6 w-6 text-blue-600" />
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-          <Card>
-            <CardContent className="p-6">
-              {loading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-8 w-32" />
-                  <Skeleton className="h-4 w-16" />
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Cash Flow</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {formatCurrency(summary?.cashFlow.current || 0)}
-                    </p>
-                    <div className="flex items-center mt-1">
-                      {(summary?.cashFlow.growth || 0) > 0 ? (
-                        <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-                      ) : (
-                        <TrendingDown className="h-4 w-4 text-red-500 mr-1" />
-                      )}
-                      <span
-                        className={`text-sm ${(summary?.cashFlow.growth || 0) > 0 ? "text-green-500" : "text-red-500"}`}
-                      >
-                        {(summary?.cashFlow.growth || 0) > 0 ? "+" : ""}
-                        {(summary?.cashFlow.growth || 0).toFixed(1)}%
-                      </span>
-                    </div>
-                  </div>
-                  <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-full">
-                    <Wallet className="h-6 w-6 text-purple-600" />
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
       </div>
 
-      {/* Quick Actions */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+      {/* Financial Metrics */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {quickActions.map((action, index) => {
-                const Icon = action.icon
-                return (
-                  <Link key={action.title} href={action.href}>
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.6 + index * 0.1 }}
-                      className="p-4 border rounded-lg hover:shadow-md transition-shadow cursor-pointer"
-                    >
-                      <div className="flex items-start space-x-3">
-                        <div className={`p-2 rounded-lg ${action.color}`}>
-                          <Icon className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-gray-900 dark:text-white">{action.title}</h3>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">{action.description}</p>
-                        </div>
-                      </div>
-                    </motion.div>
-                  </Link>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Recent Activity */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Financial Activity</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Revenue</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="space-y-4">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <Skeleton className="w-2 h-2 rounded-full" />
-                      <div className="space-y-1">
-                        <Skeleton className="h-4 w-32" />
-                        <Skeleton className="h-3 w-24" />
-                      </div>
-                    </div>
-                    <div className="text-right space-y-1">
-                      <Skeleton className="h-4 w-20" />
-                      <Skeleton className="h-3 w-16" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : summary?.recentActivity && summary.recentActivity.length > 0 ? (
-              <div className="space-y-4">
-                {summary.recentActivity.map((activity) => (
-                  <div
-                    key={activity.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-2 h-2 rounded-full ${getActivityIcon(activity.type)}`}></div>
-                      <div>
-                        <p className="font-medium">{activity.description}</p>
-                        <p className="text-sm text-gray-500">
-                          {activity.reference ? `${activity.reference} - ` : ""}
-                          {activity.accountName}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className={`font-medium ${formatActivityColor(activity.type)}`}>
-                        {formatActivityAmount(activity.amount, activity.type)}
-                      </p>
-                      <p className="text-sm text-gray-500">{new Date(activity.date).toLocaleDateString()}</p>
-                    </div>
-                  </div>
-                ))}
+              <div className="space-y-2">
+                <Skeleton className="h-8 w-24" />
+                <Skeleton className="h-4 w-16" />
               </div>
             ) : (
-              <div className="text-center py-8">
-                <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No recent financial activity found</p>
-                <p className="text-sm text-gray-400 mt-1">
-                  Recent transactions will appear here once you start recording financial data
-                </p>
-              </div>
+              <>
+                <div className="text-2xl font-bold">{formatCurrency(data?.metrics.revenue.current || 0)}</div>
+                {formatGrowth(data?.metrics.revenue.growth || 0)}
+              </>
             )}
           </CardContent>
         </Card>
-      </motion.div>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Expenses</CardTitle>
+            <CreditCard className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-8 w-24" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{formatCurrency(data?.metrics.expenses.current || 0)}</div>
+                {formatGrowth(data?.metrics.expenses.growth || 0)}
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-8 w-24" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{formatCurrency(data?.metrics.profit.current || 0)}</div>
+                {formatGrowth(data?.metrics.profit.growth || 0)}
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Cash Flow</CardTitle>
+            <PiggyBank className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-8 w-24" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{formatCurrency(data?.metrics.cashFlow.current || 0)}</div>
+                <p className="text-xs text-muted-foreground">Current cash & bank balance</p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Activity */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Recent Financial Activity
+          </CardTitle>
+          <CardDescription>Latest transactions from the past 7 days</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="space-y-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-3 w-32" />
+                  </div>
+                  <Skeleton className="h-6 w-20" />
+                </div>
+              ))}
+            </div>
+          ) : data?.recentActivity && data.recentActivity.length > 0 ? (
+            <div className="space-y-4">
+              {data.recentActivity.map((activity) => (
+                <div key={activity._id} className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium leading-none">{activity.description}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-muted-foreground">{activity.account.name}</p>
+                      {activity.reference && (
+                        <>
+                          <span className="text-xs text-muted-foreground">•</span>
+                          <p className="text-xs text-muted-foreground">{activity.reference}</p>
+                        </>
+                      )}
+                      <span className="text-xs text-muted-foreground">•</span>
+                      <p className="text-xs text-muted-foreground">{new Date(activity.date).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  <Badge
+                    variant={activity.type === "credit" ? "default" : "secondary"}
+                    className={activity.type === "credit" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}
+                  >
+                    {activity.type === "credit" ? "+" : "-"}
+                    {formatCurrency(activity.amount)}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-8">No recent financial activity found</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

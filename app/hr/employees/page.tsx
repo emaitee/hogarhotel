@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { DataTable } from '@/components/shared/DataTable';
-import { employees, departments } from '@/lib/hrData';
+import { departments } from '@/lib/hrData'; // Keep departments for the form
 import { formatCurrency } from '@/lib/utils';
 import { Plus, Edit, Eye, Phone, Mail, ArrowLeft, User, Building, Calendar } from 'lucide-react';
 import Link from 'next/link';
@@ -27,8 +27,29 @@ const columns = [
 ];
 
 export default function EmployeesPage() {
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        const response = await fetch('/api/hr/employees');
+        if (!response.ok) {
+          throw new Error(`Error: ${response.status}`);
+        }
+        const data = await response.json();
+        setEmployees(data.data);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchEmployees();
+  }, []);
 
   const renderCell = (employee: any, column: any) => {
     switch (column.key) {
